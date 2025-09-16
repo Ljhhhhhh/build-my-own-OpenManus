@@ -12,14 +12,14 @@ from datetime import datetime
 import openai
 from openai import AsyncOpenAI
 
-from .config import ChatBotConfig
-from .exceptions import (
+from config import ChatBotConfig
+from exceptions import (
     APIError, 
     RateLimitError, 
     AuthenticationError, 
     ValidationError
 )
-from .logger import logger
+from logger import logger
 
 
 @dataclass
@@ -96,7 +96,7 @@ class SimpleChatBot:
         Args:
             config: 配置对象，如果为 None 则使用默认配置
         """
-        from .config import config as default_config
+        from config import config as default_config
         
         self.config = config or default_config
         self.client = AsyncOpenAI(

@@ -9,8 +9,9 @@ import sys
 from typing import Optional
 from colorama import Fore, Style, init
 
-from . import SimpleChatBot, logger
-from .exceptions import ChatBotError, ValidationError, APIError
+from chatbot import SimpleChatBot
+from logger import logger
+from exceptions import ChatBotError, ValidationError, APIError
 
 # 初始化 colorama
 init(autoreset=True)
