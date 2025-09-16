@@ -1,4 +1,4 @@
-# OpenManus AI应用开发快速开始模板
+# OpenManus AI 应用开发快速开始模板
 
 ## 项目结构模板
 
@@ -50,6 +50,7 @@ ai_agent_project/
 ## 快速开始脚本
 
 ### setup.py
+
 ```python
 #!/usr/bin/env python3
 """
@@ -71,20 +72,20 @@ def create_virtual_env():
 def install_dependencies():
     """安装依赖"""
     print("📦 安装依赖包...")
-    
+
     # 根据操作系统选择激活脚本
     if os.name == 'nt':  # Windows
         pip_path = "venv\\Scripts\\pip"
     else:  # Unix/Linux/MacOS
         pip_path = "venv/bin/pip"
-    
+
     subprocess.run([pip_path, "install", "-r", "requirements.txt"])
     print("✅ 依赖安装完成")
 
 def create_env_file():
     """创建环境变量文件"""
     print("🔑 创建环境配置文件...")
-    
+
     env_content = """
 # OpenAI API配置
 OPENAI_API_KEY=your_openai_api_key_here
@@ -102,20 +103,20 @@ MAX_REACT_STEPS=10
 DEBUG=True
 TEST_MODE=False
     """.strip()
-    
+
     with open(".env", "w", encoding="utf-8") as f:
         f.write(env_content)
-    
+
     print("✅ 环境配置文件创建完成")
     print("⚠️  请编辑 .env 文件，填入你的API密钥")
 
 def create_project_structure():
     """创建项目目录结构"""
     print("📁 创建项目目录结构...")
-    
+
     directories = [
         "src/agent",
-        "src/tools", 
+        "src/tools",
         "src/memory",
         "src/utils",
         "config",
@@ -124,27 +125,27 @@ def create_project_structure():
         "docs",
         "logs"
     ]
-    
+
     for directory in directories:
         Path(directory).mkdir(parents=True, exist_ok=True)
         # 创建 __init__.py 文件
         if directory.startswith("src/"):
             init_file = Path(directory) / "__init__.py"
             init_file.touch()
-    
+
     print("✅ 项目目录结构创建完成")
 
 def main():
     """主函数"""
     print("🚀 OpenManus AI应用开发环境初始化")
     print("=" * 50)
-    
+
     try:
         create_project_structure()
         create_virtual_env()
         install_dependencies()
         create_env_file()
-        
+
         print("\n🎉 项目初始化完成！")
         print("\n下一步：")
         print("1. 编辑 .env 文件，填入你的API密钥")
@@ -154,7 +155,7 @@ def main():
         else:
             print("   source venv/bin/activate")
         print("3. 运行示例：python examples/simple_chat.py")
-        
+
     except Exception as e:
         print(f"❌ 初始化失败：{e}")
         sys.exit(1)
@@ -164,6 +165,7 @@ if __name__ == "__main__":
 ```
 
 ### requirements.txt
+
 ```
 # 核心依赖
 openai>=1.0.0
@@ -204,6 +206,7 @@ mypy>=1.0.0
 ## 核心模板文件
 
 ### src/main.py
+
 ```python
 #!/usr/bin/env python3
 """
@@ -230,42 +233,42 @@ def check_environment():
     """检查环境配置"""
     required_vars = ["OPENAI_API_KEY"]
     missing_vars = []
-    
+
     for var in required_vars:
         if not os.getenv(var):
             missing_vars.append(var)
-    
+
     if missing_vars:
         logger.error(f"缺少必要的环境变量: {', '.join(missing_vars)}")
         logger.info("请检查 .env 文件配置")
         return False
-    
+
     return True
 
 async def interactive_chat():
     """交互式聊天"""
     if not check_environment():
         return
-    
+
     # 初始化代理
     agent = ToolCallingAgent(
         api_key=os.getenv("OPENAI_API_KEY"),
         weather_api_key=os.getenv("WEATHER_API_KEY")
     )
-    
+
     logger.info("🤖 AI助手已启动！")
     logger.info("可用工具：")
     for tool in agent.get_available_tools():
         logger.info(f"  - {tool['name']}: {tool['description']}")
-    
+
     logger.info("\n输入 'quit' 或 'exit' 退出")
     logger.info("输入 'clear' 清空对话历史")
     logger.info("输入 'tools' 查看可用工具")
-    
+
     while True:
         try:
             user_input = input("\n👤 你: ").strip()
-            
+
             if user_input.lower() in ['quit', 'exit', 'q']:
                 logger.info("👋 再见！")
                 break
@@ -280,12 +283,12 @@ async def interactive_chat():
                 continue
             elif not user_input:
                 continue
-            
+
             # 处理用户消息
             logger.info("🤔 思考中...")
             response = await agent.process_message(user_input)
             logger.info(f"🤖 助手: {response}")
-            
+
         except KeyboardInterrupt:
             logger.info("\n👋 再见！")
             break
@@ -301,16 +304,16 @@ def main():
     """主函数"""
     # 设置日志
     setup_logger()
-    
+
     # 解析命令行参数
     import argparse
     parser = argparse.ArgumentParser(description="OpenManus AI应用")
     parser.add_argument("--mode", choices=["chat", "batch"], default="chat",
                        help="运行模式：chat(交互式) 或 batch(批处理)")
     parser.add_argument("--config", help="配置文件路径")
-    
+
     args = parser.parse_args()
-    
+
     try:
         if args.mode == "chat":
             asyncio.run(interactive_chat())
@@ -324,6 +327,7 @@ if __name__ == "__main__":
 ```
 
 ### src/utils/logger.py
+
 ```python
 """
 日志配置模块
@@ -338,10 +342,10 @@ def setup_logger(log_level: str = None, log_file: str = None):
     """设置日志配置"""
     # 移除默认处理器
     logger.remove()
-    
+
     # 获取日志级别
     log_level = log_level or os.getenv("LOG_LEVEL", "INFO")
-    
+
     # 控制台输出格式
     console_format = (
         "<green>{time:YYYY-MM-DD HH:mm:ss}</green> | "
@@ -349,7 +353,7 @@ def setup_logger(log_level: str = None, log_file: str = None):
         "<cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - "
         "<level>{message}</level>"
     )
-    
+
     # 添加控制台处理器
     logger.add(
         sys.stdout,
@@ -357,20 +361,20 @@ def setup_logger(log_level: str = None, log_file: str = None):
         level=log_level,
         colorize=True
     )
-    
+
     # 添加文件处理器
     log_dir = Path("logs")
     log_dir.mkdir(exist_ok=True)
-    
+
     log_file = log_file or log_dir / "app.log"
-    
+
     file_format = (
         "{time:YYYY-MM-DD HH:mm:ss} | "
         "{level: <8} | "
         "{name}:{function}:{line} - "
         "{message}"
     )
-    
+
     logger.add(
         log_file,
         format=file_format,
@@ -379,11 +383,12 @@ def setup_logger(log_level: str = None, log_file: str = None):
         retention="7 days",
         compression="zip"
     )
-    
+
     logger.info(f"日志系统已初始化，级别: {log_level}")
 ```
 
 ### config/agent_config.toml
+
 ```toml
 # AI代理配置文件
 
@@ -437,6 +442,7 @@ file_retention = "7 days"
 ## 示例文件
 
 ### examples/simple_chat.py
+
 ```python
 #!/usr/bin/env python3
 """
@@ -461,18 +467,18 @@ async def main():
     """简单聊天示例"""
     print("🤖 简单聊天机器人示例")
     print("=" * 30)
-    
+
     # 检查API密钥
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
         print("❌ 请在 .env 文件中设置 OPENAI_API_KEY")
         return
-    
+
     # 创建代理
     agent = ToolCallingAgent(api_key=api_key)
-    
+
     print("助手已启动！输入 'quit' 退出\n")
-    
+
     # 预设问题
     sample_questions = [
         "你好！",
@@ -480,26 +486,26 @@ async def main():
         "什么是人工智能？",
         "帮我解释一下Python的装饰器"
     ]
-    
+
     print("💡 你可以尝试这些问题：")
     for i, q in enumerate(sample_questions, 1):
         print(f"  {i}. {q}")
     print()
-    
+
     while True:
         try:
             user_input = input("👤 你: ").strip()
-            
+
             if user_input.lower() in ['quit', 'exit', 'q']:
                 print("👋 再见！")
                 break
-            
+
             if not user_input:
                 continue
-            
+
             response = await agent.process_message(user_input)
             print(f"🤖 助手: {response}\n")
-            
+
         except KeyboardInterrupt:
             print("\n👋 再见！")
             break
@@ -511,6 +517,7 @@ if __name__ == "__main__":
 ```
 
 ### tests/test_agent.py
+
 ```python
 """
 代理测试模块
@@ -544,6 +551,7 @@ async def test_conversation_memory():
 ## 快速部署脚本
 
 ### deploy.sh (Linux/MacOS)
+
 ```bash
 #!/bin/bash
 
@@ -591,6 +599,7 @@ echo "3. 运行应用: python src/main.py"
 ```
 
 ### deploy.bat (Windows)
+
 ```batch
 @echo off
 echo 🚀 开始部署 OpenManus AI应用
@@ -634,6 +643,7 @@ pause
 ## 使用说明
 
 ### 1. 快速开始
+
 ```bash
 # 1. 克隆或下载项目模板
 git clone <template-repo> my_ai_project
@@ -655,6 +665,7 @@ python src/main.py
 ```
 
 ### 2. 开发模式
+
 ```bash
 # 安装开发依赖
 pip install -e .
@@ -670,6 +681,7 @@ mypy src/
 ```
 
 ### 3. 生产部署
+
 ```bash
 # 使用Docker部署
 docker build -t my-ai-agent .
@@ -684,7 +696,9 @@ sudo systemctl start ai-agent
 ## 常见问题解决
 
 ### Q1: 虚拟环境创建失败
+
 **解决方案：**
+
 ```bash
 # 确保Python版本 >= 3.8
 python --version
@@ -695,7 +709,9 @@ conda activate ai_agent
 ```
 
 ### Q2: 依赖安装失败
+
 **解决方案：**
+
 ```bash
 # 升级pip
 pip install --upgrade pip
@@ -704,18 +720,22 @@ pip install --upgrade pip
 pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple/
 ```
 
-### Q3: API调用失败
+### Q3: API 调用失败
+
 **解决方案：**
-1. 检查API密钥是否正确
+
+1. 检查 API 密钥是否正确
 2. 检查网络连接
-3. 确认API配额是否充足
+3. 确认 API 配额是否充足
 4. 查看日志文件获取详细错误信息
 
 ### Q4: 工具调用异常
+
 **解决方案：**
+
 1. 检查工具参数格式
 2. 确认工具权限设置
 3. 查看工具执行日志
-4. 验证JSON Schema定义
+4. 验证 JSON Schema 定义
 
-通过这个快速开始模板，你可以在几分钟内搭建起一个完整的AI应用开发环境，并开始你的学习和开发之旅！
+通过这个快速开始模板，你可以在几分钟内搭建起一个完整的 AI 应用开发环境，并开始你的学习和开发之旅！
