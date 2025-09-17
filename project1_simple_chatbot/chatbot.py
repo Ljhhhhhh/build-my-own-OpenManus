@@ -24,16 +24,64 @@ from logger import logger
 
 @dataclass
 class Message:
-    """消息数据类"""
+    """
+    消息数据类 - 聊天机器人的核心数据结构
+    
+    这个类使用 Python 的 @dataclass 装饰器来定义一个消息对象，用于存储和管理
+    聊天对话中的每一条消息。它封装了消息的基本属性和操作方法。
+    
+    主要功能：
+    1. 数据存储：存储消息的角色、内容和时间戳
+    2. 格式转换：提供转换为 OpenAI API 所需格式的方法
+    3. 字符串表示：提供友好的字符串显示格式
+    
+    属性说明：
+    - role: 消息发送者的角色（如 "user", "assistant", "system"）
+    - content: 消息的具体内容文本
+    - timestamp: 消息创建的时间戳，默认为当前时间
+    
+    使用场景：
+    - 在对话历史中存储每条消息
+    - 与 OpenAI API 进行数据交互
+    - 在用户界面中显示消息
+    """
     role: str
     content: str
     timestamp: datetime = field(default_factory=datetime.now)
     
     def to_dict(self) -> Dict[str, str]:
-        """转换为 OpenAI API 格式"""
+        """
+        转换为 OpenAI API 格式
+        
+        将 Message 对象转换为 OpenAI API 所需的字典格式。
+        这个方法只包含 API 必需的字段（role 和 content），
+        排除了时间戳等内部使用的字段。
+        
+        Returns:
+            Dict[str, str]: 包含 role 和 content 的字典，符合 OpenAI API 规范
+            
+        示例:
+            message = Message("user", "Hello")
+            api_format = message.to_dict()
+            # 返回: {"role": "user", "content": "Hello"}
+        """
         return {"role": self.role, "content": self.content}
     
     def __str__(self) -> str:
+        """
+        返回消息的字符串表示形式
+        
+        提供一个包含时间戳、角色和内容的友好显示格式，
+        主要用于日志记录、调试和用户界面显示。
+        
+        Returns:
+            str: 格式化的消息字符串，格式为 "[时:分:秒] 角色: 内容"
+            
+        示例:
+            message = Message("user", "Hello")
+            print(message)
+            # 输出: "[14:30:25] user: Hello"
+        """
         return f"[{self.timestamp.strftime('%H:%M:%S')}] {self.role}: {self.content}"
 
 
@@ -46,7 +94,7 @@ class ConversationHistory:
     
     def add_message(self, role: str, content: str) -> None:
         """添加消息到历史记录"""
-        if not content.strip():
+        if not content.strip(): # 检查去除空白字符后的字符串是否为空
             raise ValidationError("消息内容不能为空")
         
         message = Message(role=role, content=content.strip())
@@ -54,12 +102,32 @@ class ConversationHistory:
         
         # 保持历史记录在限制范围内
         if len(self._messages) > self.max_length:
-            self._messages = self._messages[-self.max_length:]
+            self._messages = self._messages[-self.max_length:] # list[-n:] 获取列表的最后 n 个元素
         
         logger.debug(f"添加消息: {message}")
     
     def get_messages_for_api(self) -> List[Dict[str, str]]:
         """获取用于 API 调用的消息格式"""
+        # 列表推导式（List Comprehension）- Python的高效语法糖
+        # 作用：将所有Message对象转换为OpenAI API所需的字典格式
+        # 
+        # 语法解析：
+        # [表达式 for 变量 in 可迭代对象]
+        # 
+        # 具体到这行代码：
+        # - msg.to_dict()：表达式，调用每个Message对象的to_dict()方法
+        # - for msg in self._messages：遍历消息列表中的每个Message对象
+        # - 整体效果：创建一个新列表，包含所有消息的字典格式
+        #
+        # 等价的传统写法：
+        # result = []
+        # for msg in self._messages:
+        #     result.append(msg.to_dict())
+        # return result
+        #
+        # 转换示例：
+        # Message对象: Message(role="user", content="Hello")
+        # 转换后字典: {"role": "user", "content": "Hello"}
         return [msg.to_dict() for msg in self._messages]
     
     def clear(self) -> None:
