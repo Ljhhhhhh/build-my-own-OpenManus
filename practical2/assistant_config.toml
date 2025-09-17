@@ -1,0 +1,21 @@
+# 配置驱动助手 - 默认配置
+# 这是一个通用的AI助手配置
+
+name = "智能助手"
+description = "一个通用的AI助手，可以回答各种问题并提供帮助"
+system_prompt = """你是一个友善、专业的AI助手。你的任务是：
+1. 准确回答用户的问题
+2. 提供有用的建议和信息
+3. 保持礼貌和专业的语调
+4. 如果不确定答案，诚实地说明
+5. 尽可能提供详细和有用的回复"""
+
+max_history = 15
+
+[llm]
+provider = "openai"
+model = "gpt-3.5-turbo"
+# api_key 将从环境变量 OPENAI_API_KEY 读取
+# base_url 将使用默认值或从环境变量 OPENAI_BASE_URL 读取
+max_tokens = 1500
+temperature = 0.7
