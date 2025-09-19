@@ -62,10 +62,11 @@ class ToolFrameworkDemo:
         # 2. 演示计算器工具
         print("\n🧮 计算器工具演示:")
         calc_examples = [
-            {"expression": "2 + 3 * 4"},
-            {"expression": "sqrt(16) + pow(2, 3)"},
-            {"expression": "sin(pi/2) + cos(0)"},
-            {"expression": "invalid_expression"}  # 错误示例
+            {"operation": "add", "a": 10, "b": 5},
+            {"operation": "subtract", "a": 20, "b": 8},
+            {"operation": "multiply", "a": 6, "b": 7},
+            {"operation": "divide", "a": 15, "b": 3},
+            {"operation": "divide", "a": 10, "b": 0}  # 除零错误示例
         ]
         
         for example in calc_examples:
@@ -95,9 +96,9 @@ class ToolFrameworkDemo:
         
         # 准备批量任务
         tasks = [
-            ("calculator", {"expression": "1 + 1"}),
-            ("calculator", {"expression": "2 * 3"}),
-            ("calculator", {"expression": "10 / 2"})
+            ("calculator", {"operation": "add", "a": 5, "b": 3}),
+            ("calculator", {"operation": "multiply", "a": 4, "b": 6}),
+            ("calculator", {"operation": "divide", "a": 20, "b": 4})
         ]
         
         # 如果天气工具可用，添加天气查询任务
@@ -143,7 +144,7 @@ class ToolFrameworkDemo:
             ("calculator", {"wrong_param": "value"}),
             ("weather", {}),  # 缺少必需参数
             # 执行错误
-            ("calculator", {"expression": "1/0"}),  # 除零错误
+            ("calculator", {"operation": "divide", "a": 1, "b": 0}),  # 除零错误
         ]
         
         for tool_name, params in error_cases:

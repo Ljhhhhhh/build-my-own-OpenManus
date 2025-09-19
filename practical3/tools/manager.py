@@ -19,7 +19,7 @@ import asyncio
 import logging
 import time
 from typing import Dict, List, Optional, Any, Union
-from .base import BaseTool, ToolResult, ToolResultStatus
+from base import BaseTool, ToolResult, ToolResultStatus
 
 
 # 配置日志

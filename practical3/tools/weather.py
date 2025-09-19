@@ -20,7 +20,7 @@ import aiohttp
 import os
 import time
 from typing import Any, Dict, Optional
-from .base import BaseTool, ToolResult
+from base import BaseTool, ToolResult
 
 
 class WeatherTool(BaseTool):
