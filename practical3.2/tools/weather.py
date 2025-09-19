@@ -1,28 +1,21 @@
 """
-异步天气查询工具 - 高级版本
+异步天气工具
 
-这个模块实现了一个异步的天气查询工具，支持通过城市名查询当前天气信息。
-相比practical3.1，这里引入了真实的外部API调用、异步HTTP请求、缓存机制等高级特性。
+这个模块实现了一个简化的异步天气查询工具。
+专注于异步HTTP请求和外部API调用的核心概念，移除了复杂的缓存机制和高级特性。
 
 学习要点：
-1. 异步HTTP客户端的使用 (aiohttp)
-2. 外部API的集成和调用
-3. 环境变量和配置管理
-4. 缓存机制的实现
-5. 网络错误处理和重试
-6. 数据解析和格式化
-7. 速率限制和API配额管理
+1. 异步HTTP请求的实现
+2. 外部API的调用和处理
+3. JSON数据的解析
+4. 基础错误处理
 """
 
 import asyncio
 import aiohttp
-import json
-from datetime import datetime, timedelta
-from typing import Dict, Any, Optional, Union
-from urllib.parse import urlencode
+from typing import Dict, Any, Union, Optional
 
-from .base import AsyncBaseTool, ToolResult, tool_timer
-from config import Config
+from .base import AsyncBaseTool, ToolResult
 
 
 class AsyncWeatherTool(AsyncBaseTool):
@@ -33,22 +26,11 @@ class AsyncWeatherTool(AsyncBaseTool):
     class AsyncWeatherTool extends AsyncBaseTool {
         private apiKey: string;
         private baseUrl: string;
-        private cache: Map<string, CacheEntry>;
-        private httpClient: AxiosInstance;
         
-        constructor() {
-            super("async_weather", "异步天气查询工具", 30.0, 3);
-            
-            this.apiKey = process.env.OPENWEATHER_API_KEY || '';
-            this.baseUrl = 'https://api.openweathermap.org/data/2.5';
-            this.cache = new Map();
-            
-            this.httpClient = axios.create({
-                timeout: 10000,
-                headers: {
-                    'User-Agent': 'AsyncWeatherTool/1.0'
-                }
-            });
+        constructor(apiKey: string) {
+            super("async_weather", "异步天气查询工具", 30.0);
+            this.apiKey = apiKey;
+            this.baseUrl = "http://api.openweathermap.org/data/2.5";
         }
         
         get schema(): object {
@@ -57,31 +39,17 @@ class AsyncWeatherTool(AsyncBaseTool):
                 properties: {
                     city: {
                         type: "string",
-                        minLength: 1,
-                        maxLength: 100,
-                        description: "城市名称（支持中英文）"
+                        description: "要查询天气的城市名称"
                     },
                     country: {
                         type: "string",
-                        pattern: "^[A-Z]{2}$",
-                        description: "国家代码（ISO 3166-1 alpha-2）"
+                        description: "国家代码（可选）"
                     },
                     units: {
                         type: "string",
-                        enum: ["metric", "imperial", "kelvin"],
+                        enum: ["metric", "imperial", "standard"],
                         default: "metric",
                         description: "温度单位"
-                    },
-                    lang: {
-                        type: "string",
-                        enum: ["zh_cn", "en", "ja", "ko"],
-                        default: "zh_cn",
-                        description: "返回语言"
-                    },
-                    use_cache: {
-                        type: "boolean",
-                        default: true,
-                        description: "是否使用缓存"
                     }
                 },
                 required: ["city"]
@@ -89,862 +57,493 @@ class AsyncWeatherTool(AsyncBaseTool):
         }
         
         async validateInput(params: any): Promise<boolean | string> {
-            // 验证逻辑
+            const { city, country, units } = params;
+            
+            if (!city || typeof city !== "string" || city.trim().length === 0) {
+                return "城市名称不能为空";
+            }
+            
+            if (country && (typeof country !== "string" || country.length !== 2)) {
+                return "国家代码必须是2位字母";
+            }
+            
+            if (units && !["metric", "imperial", "standard"].includes(units)) {
+                return "无效的温度单位";
+            }
+            
+            return true;
         }
         
         async execute(params: any): Promise<ToolResult> {
-            // 执行逻辑
+            const { city, country, units = "metric" } = params;
+            
+            try {
+                // 构建查询参数
+                const location = country ? `${city},${country}` : city;
+                const url = `${this.baseUrl}/weather?q=${encodeURIComponent(location)}&appid=${this.apiKey}&units=${units}`;
+                
+                // 发送HTTP请求
+                const response = await fetch(url);
+                
+                if (!response.ok) {
+                    if (response.status === 404) {
+                        return ToolResult.error(`未找到城市: ${city}`);
+                    }
+                    return ToolResult.error(`API请求失败: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                
+                // 解析天气数据
+                const weatherInfo = {
+                    city: data.name,
+                    country: data.sys.country,
+                    temperature: data.main.temp,
+                    feels_like: data.main.feels_like,
+                    humidity: data.main.humidity,
+                    pressure: data.main.pressure,
+                    description: data.weather[0].description,
+                    wind_speed: data.wind?.speed || 0,
+                    units: units
+                };
+                
+                return ToolResult.success(weatherInfo);
+                
+            } catch (error) {
+                return ToolResult.error(`天气查询失败: ${error.message}`);
+            }
         }
     }
     
     学习要点：
-    - 外部API集成的完整实现
-    - 异步HTTP请求的处理
-    - 缓存机制的设计和实现
-    - 配置管理的最佳实践
-    - 错误处理和重试机制
+    - 异步HTTP请求的完整实现
+    - 外部API的集成和调用
+    - JSON数据的解析和处理
+    - 错误处理的基础实践
     """
     
-    def __init__(self):
+    def __init__(self, api_key: Optional[str] = None):
         """
-        初始化异步天气查询工具
+        初始化异步天气工具
         
         学习要点：
-        - 外部依赖的初始化
-        - 配置的加载和验证
-        - 缓存系统的设置
-        - HTTP客户端的配置
+        - 外部依赖的管理
+        - API密钥的处理
+        - 配置参数的设置
+        
+        Args:
+            api_key: OpenWeatherMap API密钥（可选，用于演示）
         """
         super().__init__(
             name="async_weather",
-            description="异步天气查询工具，支持查询全球城市的当前天气信息",
-            timeout=30.0,
-            max_retries=3
+            description="异步天气查询工具，支持全球城市天气查询",
+            timeout=30.0
         )
         
-        # 加载配置
-        self.config = Config()
-        self.api_key = self.config.get('OPENWEATHER_API_KEY', '')
-        self.base_url = 'https://api.openweathermap.org/data/2.5'
+        # API配置
+        self.api_key = api_key or "demo_key"  # 演示用密钥
+        self.base_url = "http://api.openweathermap.org/data/2.5"
         
-        # 缓存设置
-        self.cache: Dict[str, Dict[str, Any]] = {}
-        self.cache_ttl = timedelta(minutes=10)  # 缓存10分钟
-        
-        # HTTP客户端设置
-        self.session: Optional[aiohttp.ClientSession] = None
-        self.request_timeout = aiohttp.ClientTimeout(total=10)
-        
-        # API配额管理
-        self.request_count = 0
-        self.last_request_time = datetime.now()
-        self.rate_limit_per_minute = 60  # OpenWeather免费版限制
+        # 支持的温度单位
+        self.supported_units = {
+            "metric": "摄氏度",
+            "imperial": "华氏度", 
+            "standard": "开尔文"
+        }
     
     @property
     def schema(self) -> Dict[str, Any]:
         """
-        返回天气工具的JSON Schema
+        定义工具的输入参数模式
         
         学习要点：
-        - 复杂Schema的设计
-        - 字符串模式验证
-        - 枚举值的定义
-        - 国际化支持的考虑
+        - API参数的定义
+        - 枚举值的使用
+        - 可选参数的处理
+        - 默认值的设置
         
         Returns:
-            Dict[str, Any]: JSON Schema
+            Dict[str, Any]: JSON Schema 格式的参数定义
         """
         return {
             "type": "object",
             "properties": {
                 "city": {
                     "type": "string",
+                    "description": "要查询天气的城市名称",
                     "minLength": 1,
-                    "maxLength": 100,
-                    "description": "城市名称（支持中英文，如：北京、Beijing、New York）"
+                    "maxLength": 100
                 },
                 "country": {
                     "type": "string",
-                    "pattern": "^[A-Z]{2}$",
-                    "description": "国家代码（可选，ISO 3166-1 alpha-2格式，如：CN、US、JP）"
+                    "description": "国家代码（可选，如：US, CN, JP）",
+                    "pattern": "^[A-Z]{2}$"
                 },
                 "units": {
                     "type": "string",
-                    "enum": ["metric", "imperial", "kelvin"],
+                    "enum": list(self.supported_units.keys()),
                     "default": "metric",
-                    "description": "温度单位（metric=摄氏度，imperial=华氏度，kelvin=开尔文）"
-                },
-                "lang": {
-                    "type": "string",
-                    "enum": ["zh_cn", "en", "ja", "ko", "fr", "de", "es", "ru"],
-                    "default": "zh_cn",
-                    "description": "返回语言（zh_cn=中文，en=英文）"
-                },
-                "use_cache": {
-                    "type": "boolean",
-                    "default": True,
-                    "description": "是否使用缓存（提高响应速度，减少API调用）"
-                },
-                "include_forecast": {
-                    "type": "boolean",
-                    "default": False,
-                    "description": "是否包含未来几小时的天气预报"
+                    "description": "温度单位：metric(摄氏度), imperial(华氏度), standard(开尔文)"
                 }
             },
-            "required": ["city"],
-            "additionalProperties": False
+            "required": ["city"]
         }
     
     async def validate_input(self, **kwargs) -> Union[bool, str]:
         """
-        异步输入验证
-        
-        💡 对比TypeScript:
-        async validateInput(params: any): Promise<boolean | string> {
-            // API密钥验证
-            if (!this.apiKey) {
-                return "未配置OpenWeather API密钥，请设置OPENWEATHER_API_KEY环境变量";
-            }
-            
-            // 城市名验证
-            const { city, country, units, lang } = params;
-            
-            if (!city || typeof city !== 'string') {
-                return "城市名称不能为空且必须是字符串";
-            }
-            
-            if (city.trim().length === 0) {
-                return "城市名称不能为空白字符";
-            }
-            
-            if (city.length > 100) {
-                return "城市名称长度不能超过100个字符";
-            }
-            
-            // 国家代码验证
-            if (country && (typeof country !== 'string' || !/^[A-Z]{2}$/.test(country))) {
-                return "国家代码必须是2位大写字母（ISO 3166-1 alpha-2格式）";
-            }
-            
-            // 单位验证
-            if (units && !['metric', 'imperial', 'kelvin'].includes(units)) {
-                return "温度单位必须是 metric、imperial 或 kelvin 之一";
-            }
-            
-            // 语言验证
-            const supportedLangs = ['zh_cn', 'en', 'ja', 'ko', 'fr', 'de', 'es', 'ru'];
-            if (lang && !supportedLangs.includes(lang)) {
-                return `语言代码必须是以下之一: ${supportedLangs.join(', ')}`;
-            }
-            
-            // 速率限制检查
-            return await this.checkRateLimit();
-        }
+        验证输入参数
         
         学习要点：
-        - API密钥的验证
-        - 字符串格式的验证
-        - 正则表达式的使用
-        - 速率限制的检查
-        - 详细错误信息的提供
+        - 字符串参数的验证
+        - 长度和格式检查
+        - 枚举值的验证
+        - 可选参数的处理
         
         Args:
             **kwargs: 输入参数
             
         Returns:
-            Union[bool, str]: 验证结果
+            Union[bool, str]: True表示验证通过，字符串表示错误信息
         """
-        # API密钥验证
-        if not self.api_key:
-            return ("未配置OpenWeather API密钥。请在.env文件中设置OPENWEATHER_API_KEY，"
-                   "或访问 https://openweathermap.org/api 获取免费API密钥")
+        # 调用基类的基础验证
+        base_validation = await super().validate_input(**kwargs)
+        if base_validation is not True:
+            return base_validation
         
-        # 基础参数验证
-        city = kwargs.get('city')
-        if not city:
-            return "城市名称不能为空"
+        city = kwargs.get("city")
+        country = kwargs.get("country")
+        units = kwargs.get("units", "metric")
         
-        if not isinstance(city, str):
-            return "城市名称必须是字符串"
+        # 验证城市名称
+        if not city or not isinstance(city, str):
+            return "城市名称不能为空且必须是字符串"
         
-        city = city.strip()
-        if not city:
+        if len(city.strip()) == 0:
             return "城市名称不能为空白字符"
         
         if len(city) > 100:
             return "城市名称长度不能超过100个字符"
         
-        # 国家代码验证
-        country = kwargs.get('country')
-        if country:
+        # 验证国家代码（可选）
+        if country is not None:
             if not isinstance(country, str):
                 return "国家代码必须是字符串"
             
-            import re
-            if not re.match(r'^[A-Z]{2}$', country):
-                return "国家代码必须是2位大写字母（如：CN、US、JP）"
+            if len(country) != 2:
+                return "国家代码必须是2位字母（如：US, CN, JP）"
+            
+            if not country.isalpha() or not country.isupper():
+                return "国家代码必须是2位大写字母"
         
-        # 温度单位验证
-        units = kwargs.get('units', 'metric')
-        if units not in ['metric', 'imperial', 'kelvin']:
-            return "温度单位必须是 metric（摄氏度）、imperial（华氏度）或 kelvin（开尔文）之一"
-        
-        # 语言验证
-        lang = kwargs.get('lang', 'zh_cn')
-        supported_langs = ['zh_cn', 'en', 'ja', 'ko', 'fr', 'de', 'es', 'ru']
-        if lang not in supported_langs:
-            return f"语言代码必须是以下之一: {', '.join(supported_langs)}"
-        
-        # 速率限制检查
-        rate_limit_check = await self._check_rate_limit()
-        if rate_limit_check is not True:
-            return rate_limit_check
+        # 验证温度单位
+        if units not in self.supported_units:
+            return f"不支持的温度单位: {units}。支持的单位: {list(self.supported_units.keys())}"
         
         return True
     
-    @tool_timer
     async def execute(self, **kwargs) -> ToolResult:
         """
-        异步执行天气查询
-        
-        💡 对比TypeScript:
-        @toolTimer
-        async execute(params: any): Promise<ToolResult> {
-            try {
-                const { city, country, units = 'metric', lang = 'zh_cn', use_cache = true, include_forecast = false } = params;
-                
-                // 构建缓存键
-                const cacheKey = this.buildCacheKey(city, country, units, lang);
-                
-                // 检查缓存
-                if (use_cache) {
-                    const cachedResult = this.getFromCache(cacheKey);
-                    if (cachedResult) {
-                        return ToolResult.success(cachedResult.data, {
-                            ...cachedResult.metadata,
-                            from_cache: true,
-                            cache_age: Date.now() - cachedResult.timestamp
-                        });
-                    }
-                }
-                
-                // 确保HTTP客户端已初始化
-                await this.ensureHttpClient();
-                
-                // 构建API请求
-                const weatherData = await this.fetchWeatherData(city, country, units, lang);
-                
-                // 获取预报数据（如果需要）
-                let forecastData = null;
-                if (include_forecast) {
-                    forecastData = await this.fetchForecastData(city, country, units, lang);
-                }
-                
-                // 格式化结果
-                const formattedResult = this.formatWeatherData(weatherData, forecastData, units);
-                
-                // 更新缓存
-                if (use_cache) {
-                    this.updateCache(cacheKey, formattedResult, weatherData);
-                }
-                
-                // 构建元数据
-                const metadata = {
-                    city,
-                    country,
-                    units,
-                    lang,
-                    api_source: 'OpenWeatherMap',
-                    request_time: new Date().toISOString(),
-                    from_cache: false,
-                    include_forecast
-                };
-                
-                return ToolResult.success(formattedResult, metadata);
-                
-            } catch (error) {
-                return this.handleError(error);
-            }
-        }
+        执行天气查询
         
         学习要点：
-        - 异步HTTP请求的完整流程
-        - 缓存机制的实现和使用
-        - 外部API的调用和数据处理
-        - 错误处理的完整性
-        - 元数据的构建和管理
+        - 异步HTTP请求的实现
+        - aiohttp库的使用
+        - JSON数据的解析
+        - 错误处理和状态码检查
+        - 超时处理
         
         Args:
             **kwargs: 执行参数
             
         Returns:
-            ToolResult: 执行结果
+            ToolResult: 查询结果
         """
         try:
-            city = kwargs['city'].strip()
-            country = kwargs.get('country')
-            units = kwargs.get('units', 'metric')
-            lang = kwargs.get('lang', 'zh_cn')
-            use_cache = kwargs.get('use_cache', True)
-            include_forecast = kwargs.get('include_forecast', False)
+            city = kwargs["city"].strip()
+            country = kwargs.get("country")
+            units = kwargs.get("units", "metric")
             
-            # 构建缓存键
-            cache_key = self._build_cache_key(city, country, units, lang)
+            # 构建查询位置
+            location = f"{city},{country}" if country else city
             
-            # 检查缓存
-            if use_cache:
-                cached_result = self._get_from_cache(cache_key)
-                if cached_result:
-                    return ToolResult.success(
-                        content=cached_result['data'],
-                        metadata={
-                            **cached_result['metadata'],
-                            'from_cache': True,
-                            'cache_age_seconds': (datetime.now() - cached_result['timestamp']).total_seconds()
-                        }
-                    )
-            
-            # 确保HTTP客户端已初始化
-            await self._ensure_http_client()
-            
-            # 获取天气数据
-            weather_data = await self._fetch_weather_data(city, country, units, lang)
-            
-            # 获取预报数据（如果需要）
-            forecast_data = None
-            if include_forecast:
-                try:
-                    forecast_data = await self._fetch_forecast_data(city, country, units, lang)
-                except Exception as e:
-                    # 预报数据获取失败不影响主要功能
-                    print(f"警告：获取预报数据失败: {e}")
-            
-            # 格式化结果
-            formatted_result = self._format_weather_data(weather_data, forecast_data, units)
-            
-            # 更新缓存
-            if use_cache:
-                self._update_cache(cache_key, formatted_result, weather_data)
-            
-            # 构建元数据
-            metadata = {
-                'city': city,
-                'country': country,
-                'units': units,
-                'lang': lang,
-                'api_source': 'OpenWeatherMap',
-                'request_time': datetime.now().isoformat(),
-                'from_cache': False,
-                'include_forecast': include_forecast,
-                'api_calls_used': 1 + (1 if include_forecast else 0)
+            # 构建API URL
+            url = f"{self.base_url}/weather"
+            params = {
+                "q": location,
+                "appid": self.api_key,
+                "units": units,
+                "lang": "zh_cn"  # 中文描述
             }
             
-            return ToolResult.success(
-                content=formatted_result,
-                metadata=metadata
-            )
-            
-        except aiohttp.ClientTimeout:
-            return ToolResult.error("网络请求超时，请检查网络连接或稍后重试")
+            # 发送异步HTTP请求
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url, params=params, timeout=aiohttp.ClientTimeout(total=25)) as response:
+                    
+                    # 检查响应状态
+                    if response.status == 404:
+                        return ToolResult.error(f"未找到城市: {city}")
+                    elif response.status == 401:
+                        return ToolResult.error("API密钥无效或已过期")
+                    elif response.status == 429:
+                        return ToolResult.error("API请求频率超限，请稍后重试")
+                    elif response.status != 200:
+                        return ToolResult.error(f"API请求失败，状态码: {response.status}")
+                    
+                    # 解析JSON响应
+                    data = await response.json()
+                    
+                    # 提取天气信息
+                    weather_info = self._parse_weather_data(data, units)
+                    
+                    return ToolResult.success(weather_info)
         
+        except asyncio.TimeoutError:
+            return ToolResult.error("天气查询超时，请检查网络连接")
         except aiohttp.ClientError as e:
-            return ToolResult.error(f"网络请求失败: {str(e)}")
-        
-        except json.JSONDecodeError:
-            return ToolResult.error("API返回数据格式错误，无法解析JSON")
-        
+            return ToolResult.error(f"网络请求错误: {str(e)}")
         except KeyError as e:
-            return ToolResult.error(f"API返回数据缺少必要字段: {str(e)}")
-        
+            return ToolResult.error(f"API响应数据格式错误，缺少字段: {str(e)}")
         except Exception as e:
-            return ToolResult.error(f"天气查询异常: {str(e)}")
+            return ToolResult.error(f"天气查询失败: {str(e)}")
     
-    async def _ensure_http_client(self):
+    def _parse_weather_data(self, data: Dict[str, Any], units: str) -> Dict[str, Any]:
         """
-        确保HTTP客户端已初始化
+        解析天气API响应数据
         
         学习要点：
-        - 异步资源的延迟初始化
-        - HTTP客户端的配置
-        - 连接池的管理
-        """
-        if self.session is None or self.session.closed:
-            connector = aiohttp.TCPConnector(
-                limit=10,  # 连接池大小
-                limit_per_host=5,  # 每个主机的连接数
-                ttl_dns_cache=300,  # DNS缓存时间
-                use_dns_cache=True
-            )
-            
-            self.session = aiohttp.ClientSession(
-                connector=connector,
-                timeout=self.request_timeout,
-                headers={
-                    'User-Agent': 'AsyncWeatherTool/1.0',
-                    'Accept': 'application/json',
-                    'Accept-Encoding': 'gzip, deflate'
-                }
-            )
-    
-    async def _fetch_weather_data(self, city: str, country: Optional[str], 
-                                units: str, lang: str) -> Dict[str, Any]:
-        """
-        获取天气数据
-        
-        学习要点：
-        - 异步HTTP请求的实现
-        - URL参数的构建
-        - API响应的处理
-        - 错误状态码的处理
+        - JSON数据的解析和提取
+        - 数据结构的转换
+        - 安全的字典访问
+        - 数据格式化
         
         Args:
-            city: 城市名称
-            country: 国家代码
-            units: 温度单位
-            lang: 语言
-            
-        Returns:
-            Dict[str, Any]: 天气数据
-        """
-        # 构建查询参数
-        query_params = {
-            'q': f"{city},{country}" if country else city,
-            'appid': self.api_key,
-            'units': units,
-            'lang': lang
-        }
-        
-        url = f"{self.base_url}/weather?{urlencode(query_params)}"
-        
-        # 发送请求
-        async with self.session.get(url) as response:
-            # 更新请求计数
-            self.request_count += 1
-            self.last_request_time = datetime.now()
-            
-            # 检查响应状态
-            if response.status == 200:
-                return await response.json()
-            elif response.status == 401:
-                raise Exception("API密钥无效，请检查OPENWEATHER_API_KEY配置")
-            elif response.status == 404:
-                raise Exception(f"未找到城市 '{city}' 的天气信息，请检查城市名称拼写")
-            elif response.status == 429:
-                raise Exception("API调用频率超限，请稍后重试")
-            else:
-                error_text = await response.text()
-                raise Exception(f"API请求失败 (状态码: {response.status}): {error_text}")
-    
-    async def _fetch_forecast_data(self, city: str, country: Optional[str], 
-                                 units: str, lang: str) -> Dict[str, Any]:
-        """
-        获取预报数据
-        
-        学习要点：
-        - 多个API端点的调用
-        - 数据的组合和处理
-        - 可选功能的实现
-        
-        Args:
-            city: 城市名称
-            country: 国家代码
-            units: 温度单位
-            lang: 语言
-            
-        Returns:
-            Dict[str, Any]: 预报数据
-        """
-        query_params = {
-            'q': f"{city},{country}" if country else city,
-            'appid': self.api_key,
-            'units': units,
-            'lang': lang,
-            'cnt': 8  # 未来24小时（每3小时一个数据点）
-        }
-        
-        url = f"{self.base_url}/forecast?{urlencode(query_params)}"
-        
-        async with self.session.get(url) as response:
-            self.request_count += 1
-            
-            if response.status == 200:
-                return await response.json()
-            else:
-                # 预报数据获取失败不抛出异常，返回None
-                return None
-    
-    def _format_weather_data(self, weather_data: Dict[str, Any], 
-                           forecast_data: Optional[Dict[str, Any]], 
-                           units: str) -> str:
-        """
-        格式化天气数据
-        
-        学习要点：
-        - 数据的解析和提取
-        - 字符串格式化技巧
-        - 国际化的处理
-        - 可选数据的处理
-        
-        Args:
-            weather_data: 当前天气数据
-            forecast_data: 预报数据
+            data: API响应的JSON数据
             units: 温度单位
             
         Returns:
-            str: 格式化后的天气信息
+            Dict[str, Any]: 格式化后的天气信息
         """
-        try:
-            # 提取基本信息
-            city_name = weather_data['name']
-            country = weather_data['sys']['country']
-            
-            # 提取天气信息
-            main = weather_data['main']
-            weather = weather_data['weather'][0]
-            wind = weather_data.get('wind', {})
-            clouds = weather_data.get('clouds', {})
-            
-            # 温度单位符号
-            temp_unit = {
-                'metric': '°C',
-                'imperial': '°F',
-                'kelvin': 'K'
-            }.get(units, '°C')
-            
-            # 风速单位
-            wind_unit = 'km/h' if units == 'metric' else 'mph'
-            
-            # 构建基本天气信息
-            result = f"🌍 {city_name}, {country} 当前天气\n"
-            result += "=" * 30 + "\n\n"
-            
-            result += f"🌡️  温度: {main['temp']:.1f}{temp_unit}\n"
-            result += f"🤔  体感温度: {main['feels_like']:.1f}{temp_unit}\n"
-            result += f"📊  温度范围: {main['temp_min']:.1f}{temp_unit} ~ {main['temp_max']:.1f}{temp_unit}\n"
-            
-            result += f"☁️  天气: {weather['description']}\n"
-            result += f"💧  湿度: {main['humidity']}%\n"
-            result += f"🌪️  气压: {main['pressure']} hPa\n"
-            
-            if 'speed' in wind:
-                result += f"💨  风速: {wind['speed']:.1f} {wind_unit}"
-                if 'deg' in wind:
-                    direction = self._get_wind_direction(wind['deg'])
-                    result += f" ({direction})"
-                result += "\n"
-            
-            if 'all' in clouds:
-                result += f"☁️  云量: {clouds['all']}%\n"
-            
-            # 添加能见度信息
-            if 'visibility' in weather_data:
-                visibility_km = weather_data['visibility'] / 1000
-                result += f"👁️  能见度: {visibility_km:.1f} km\n"
-            
-            # 添加日出日落信息
-            if 'sunrise' in weather_data['sys'] and 'sunset' in weather_data['sys']:
-                sunrise = datetime.fromtimestamp(weather_data['sys']['sunrise'])
-                sunset = datetime.fromtimestamp(weather_data['sys']['sunset'])
-                result += f"🌅  日出: {sunrise.strftime('%H:%M')}\n"
-                result += f"🌇  日落: {sunset.strftime('%H:%M')}\n"
-            
-            # 添加预报信息
-            if forecast_data and 'list' in forecast_data:
-                result += "\n📅 未来24小时预报\n"
-                result += "-" * 20 + "\n"
-                
-                for i, forecast in enumerate(forecast_data['list'][:8]):
-                    time = datetime.fromtimestamp(forecast['dt'])
-                    temp = forecast['main']['temp']
-                    desc = forecast['weather'][0]['description']
-                    result += f"{time.strftime('%H:%M')} | {temp:.1f}{temp_unit} | {desc}\n"
-            
-            # 添加数据更新时间
-            update_time = datetime.fromtimestamp(weather_data['dt'])
-            result += f"\n⏰ 数据更新时间: {update_time.strftime('%Y-%m-%d %H:%M:%S')}"
-            
-            return result
-            
-        except KeyError as e:
-            raise Exception(f"天气数据格式错误，缺少字段: {e}")
-        except Exception as e:
-            raise Exception(f"格式化天气数据失败: {e}")
-    
-    def _get_wind_direction(self, degrees: float) -> str:
-        """
-        根据角度获取风向
-        
-        学习要点：
-        - 数值范围的映射
-        - 条件判断的优化
-        - 国际化字符串的处理
-        
-        Args:
-            degrees: 风向角度
-            
-        Returns:
-            str: 风向描述
-        """
-        directions = [
-            "北", "北北东", "东北", "东北东",
-            "东", "东南东", "东南", "南南东",
-            "南", "南南西", "西南", "西南西",
-            "西", "西北西", "西北", "北北西"
-        ]
-        
-        index = int((degrees + 11.25) / 22.5) % 16
-        return directions[index]
-    
-    async def _check_rate_limit(self) -> Union[bool, str]:
-        """
-        检查API调用速率限制
-        
-        学习要点：
-        - 速率限制的实现
-        - 时间窗口的计算
-        - 异步等待的使用
-        
-        Returns:
-            Union[bool, str]: 检查结果
-        """
-        now = datetime.now()
-        time_diff = (now - self.last_request_time).total_seconds()
-        
-        # 如果距离上次请求超过1分钟，重置计数
-        if time_diff > 60:
-            self.request_count = 0
-            self.last_request_time = now
-        
-        # 检查是否超过速率限制
-        if self.request_count >= self.rate_limit_per_minute:
-            wait_time = 60 - time_diff
-            return f"API调用频率超限，请等待 {wait_time:.0f} 秒后重试"
-        
-        return True
-    
-    def _build_cache_key(self, city: str, country: Optional[str], 
-                        units: str, lang: str) -> str:
-        """
-        构建缓存键
-        
-        学习要点：
-        - 缓存键的设计原则
-        - 字符串的标准化处理
-        - 哈希值的使用
-        
-        Args:
-            city: 城市名称
-            country: 国家代码
-            units: 温度单位
-            lang: 语言
-            
-        Returns:
-            str: 缓存键
-        """
-        key_parts = [
-            city.lower().strip(),
-            country.upper() if country else '',
-            units,
-            lang
-        ]
-        return '|'.join(key_parts)
-    
-    def _get_from_cache(self, cache_key: str) -> Optional[Dict[str, Any]]:
-        """
-        从缓存获取数据
-        
-        学习要点：
-        - 缓存的读取和验证
-        - 过期时间的检查
-        - 缓存命中率的优化
-        
-        Args:
-            cache_key: 缓存键
-            
-        Returns:
-            Optional[Dict[str, Any]]: 缓存数据
-        """
-        if cache_key not in self.cache:
-            return None
-        
-        cache_entry = self.cache[cache_key]
-        
-        # 检查是否过期
-        if datetime.now() - cache_entry['timestamp'] > self.cache_ttl:
-            del self.cache[cache_key]
-            return None
-        
-        return cache_entry
-    
-    def _update_cache(self, cache_key: str, formatted_result: str, 
-                     raw_data: Dict[str, Any]):
-        """
-        更新缓存
-        
-        学习要点：
-        - 缓存的写入和更新
-        - 缓存大小的控制
-        - 内存使用的优化
-        
-        Args:
-            cache_key: 缓存键
-            formatted_result: 格式化结果
-            raw_data: 原始数据
-        """
-        # 限制缓存大小
-        if len(self.cache) > 100:
-            # 删除最旧的缓存项
-            oldest_key = min(self.cache.keys(), 
-                           key=lambda k: self.cache[k]['timestamp'])
-            del self.cache[oldest_key]
-        
-        self.cache[cache_key] = {
-            'data': formatted_result,
-            'timestamp': datetime.now(),
-            'metadata': {
-                'city': raw_data['name'],
-                'country': raw_data['sys']['country'],
-                'coordinates': raw_data['coord']
+        # 基础信息
+        weather_info = {
+            "city": data["name"],
+            "country": data["sys"]["country"],
+            "coordinates": {
+                "latitude": data["coord"]["lat"],
+                "longitude": data["coord"]["lon"]
             }
         }
+        
+        # 温度信息
+        main_data = data["main"]
+        weather_info.update({
+            "temperature": main_data["temp"],
+            "feels_like": main_data["feels_like"],
+            "min_temperature": main_data.get("temp_min"),
+            "max_temperature": main_data.get("temp_max"),
+            "humidity": main_data["humidity"],
+            "pressure": main_data["pressure"]
+        })
+        
+        # 天气描述
+        weather_data = data["weather"][0]
+        weather_info.update({
+            "condition": weather_data["main"],
+            "description": weather_data["description"],
+            "icon": weather_data["icon"]
+        })
+        
+        # 风力信息
+        wind_data = data.get("wind", {})
+        weather_info["wind"] = {
+            "speed": wind_data.get("speed", 0),
+            "direction": wind_data.get("deg")
+        }
+        
+        # 其他信息
+        weather_info.update({
+            "visibility": data.get("visibility"),
+            "cloudiness": data.get("clouds", {}).get("all"),
+            "units": units,
+            "unit_symbol": self._get_temperature_symbol(units),
+            "timestamp": data["dt"]
+        })
+        
+        # 格式化显示
+        weather_info["formatted"] = self._format_weather_display(weather_info)
+        
+        return weather_info
     
-    async def cleanup(self):
+    def _get_temperature_symbol(self, units: str) -> str:
         """
-        清理资源
+        获取温度单位符号
+        
+        Args:
+            units: 温度单位
+            
+        Returns:
+            str: 温度符号
+        """
+        symbols = {
+            "metric": "°C",
+            "imperial": "°F",
+            "standard": "K"
+        }
+        return symbols.get(units, "°C")
+    
+    def _format_weather_display(self, weather_info: Dict[str, Any]) -> str:
+        """
+        格式化天气信息显示
         
         学习要点：
-        - 异步资源的清理
-        - 连接池的关闭
-        - 内存的释放
-        """
-        if self.session and not self.session.closed:
-            await self.session.close()
+        - 字符串格式化
+        - 数据展示的优化
+        - 用户友好的信息呈现
         
-        self.cache.clear()
+        Args:
+            weather_info: 天气信息字典
+            
+        Returns:
+            str: 格式化后的天气描述
+        """
+        city = weather_info["city"]
+        country = weather_info["country"]
+        temp = weather_info["temperature"]
+        feels_like = weather_info["feels_like"]
+        description = weather_info["description"]
+        humidity = weather_info["humidity"]
+        wind_speed = weather_info["wind"]["speed"]
+        symbol = weather_info["unit_symbol"]
+        
+        formatted = f"""
+🌤️ {city}, {country} 天气信息:
+🌡️ 温度: {temp}{symbol} (体感: {feels_like}{symbol})
+☁️ 天气: {description}
+💧 湿度: {humidity}%
+💨 风速: {wind_speed} m/s
+        """.strip()
+        
+        return formatted
 
 
 # 测试代码
 if __name__ == "__main__":
-    """
-    测试异步天气查询工具
-    
-    学习要点：
-    - 异步工具的测试方法
-    - 外部API的模拟测试
-    - 错误情况的测试
-    - 缓存机制的测试
-    """
+    import asyncio
     
     async def test_async_weather():
-        """测试异步天气工具"""
+        """
+        测试异步天气查询功能
+        
+        学习要点：
+        - 异步测试的编写
+        - HTTP请求的测试
+        - 错误情况的模拟
+        - 结果验证的方法
+        """
         print("🌤️ 测试异步天气查询工具")
         print("=" * 40)
         
+        # 创建天气工具实例（使用演示密钥）
         weather_tool = AsyncWeatherTool()
+        print(f"工具信息: {weather_tool}")
+        print(f"支持的温度单位: {list(weather_tool.supported_units.keys())}")
         
-        # 检查API密钥配置
-        if not weather_tool.api_key:
-            print("⚠️  警告：未配置OpenWeather API密钥")
-            print("请在.env文件中设置OPENWEATHER_API_KEY")
-            print("或访问 https://openweathermap.org/api 获取免费API密钥")
-            return
+        # 测试用例（注意：由于使用演示密钥，实际请求会失败，这里主要测试验证逻辑）
+        test_cases = [
+            {"city": "Beijing", "country": "CN", "units": "metric", "description": "北京天气查询"},
+            {"city": "Shanghai", "units": "metric", "description": "上海天气查询"},
+            {"city": "New York", "country": "US", "units": "imperial", "description": "纽约天气查询"},
+            {"city": "Tokyo", "country": "JP", "units": "metric", "description": "东京天气查询"},
+        ]
         
-        try:
-            # 测试用例
-            test_cases = [
-                {
-                    "name": "北京天气查询",
-                    "params": {"city": "Beijing", "country": "CN", "lang": "zh_cn"}
-                },
-                {
-                    "name": "纽约天气查询",
-                    "params": {"city": "New York", "country": "US", "units": "imperial", "lang": "en"}
-                },
-                {
-                    "name": "东京天气查询（含预报）",
-                    "params": {"city": "Tokyo", "country": "JP", "include_forecast": True}
-                },
-                {
-                    "name": "上海天气查询（使用缓存）",
-                    "params": {"city": "Shanghai", "use_cache": True}
-                }
-            ]
-            
-            print("\n1. 测试天气查询:")
-            for i, test_case in enumerate(test_cases):
-                print(f"\n{i+1}. {test_case['name']}")
-                print("-" * 30)
-                
-                result = await weather_tool.execute_with_timeout(**test_case['params'])
-                
-                if result.is_success():
-                    print("✅ 查询成功")
-                    print(result.content[:200] + "..." if len(result.content) > 200 else result.content)
-                    
-                    # 显示元数据
-                    if result.metadata:
-                        print(f"\n📊 元数据:")
-                        for key, value in result.metadata.items():
-                            print(f"  {key}: {value}")
-                else:
-                    print(f"❌ 查询失败: {result.error_message}")
-                
-                # 添加延迟避免速率限制
-                await asyncio.sleep(1)
-            
-            # 测试缓存功能
-            print("\n\n2. 测试缓存功能:")
-            print("-" * 30)
-            
-            # 第一次查询
-            start_time = datetime.now()
-            result1 = await weather_tool.execute_with_timeout(city="Beijing", use_cache=True)
-            time1 = (datetime.now() - start_time).total_seconds()
-            
-            # 第二次查询（应该使用缓存）
-            start_time = datetime.now()
-            result2 = await weather_tool.execute_with_timeout(city="Beijing", use_cache=True)
-            time2 = (datetime.now() - start_time).total_seconds()
-            
-            print(f"第一次查询耗时: {time1:.2f}秒")
-            print(f"第二次查询耗时: {time2:.2f}秒")
-            
-            if result2.metadata and result2.metadata.get('from_cache'):
-                print("✅ 缓存功能正常工作")
-            else:
-                print("⚠️  缓存功能可能未生效")
+        print("\n🧪 测试输入验证:")
+        for i, test_case in enumerate(test_cases, 1):
+            city = test_case["city"]
+            country = test_case.get("country")
+            units = test_case.get("units", "metric")
+            description = test_case["description"]
             
             # 测试输入验证
-            print("\n\n3. 测试输入验证:")
-            print("-" * 30)
+            validation_result = await weather_tool.validate_input(
+                city=city, country=country, units=units
+            )
             
-            validation_cases = [
-                {"city": ""},  # 空城市名
-                {"city": "Beijing", "country": "invalid"},  # 无效国家代码
-                {"city": "Beijing", "units": "invalid"},  # 无效单位
-                {"city": "Beijing", "lang": "invalid"}  # 无效语言
-            ]
-            
-            for i, case in enumerate(validation_cases):
-                validation_result = await weather_tool.validate_input(**case)
-                status = "✅" if validation_result is not True else "❌"
-                print(f"  {status} 验证案例 {i+1}: {validation_result}")
-            
-            # 显示工具统计
-            print("\n\n4. 工具统计:")
-            print("-" * 30)
-            stats = weather_tool.get_stats()
-            for key, value in stats.items():
-                print(f"  {key}: {value}")
-            
-            print(f"  API调用次数: {weather_tool.request_count}")
-            print(f"  缓存项数量: {len(weather_tool.cache)}")
-            
-        finally:
-            # 清理资源
-            await weather_tool.cleanup()
+            if validation_result is True:
+                print(f"  {i}. {description}: 输入验证通过 ✅")
+            else:
+                print(f"  {i}. {description}: 输入验证失败 - {validation_result} ❌")
         
-        print("\n✅ 异步天气查询工具测试完成！")
+        # 测试错误情况
+        print("\n🚫 测试错误情况:")
+        
+        error_cases = [
+            {"city": "", "description": "空城市名称"},
+            {"city": "Beijing", "country": "CHN", "description": "无效国家代码（3位）"},
+            {"city": "Shanghai", "country": "cn", "description": "小写国家代码"},
+            {"city": "Tokyo", "units": "celsius", "description": "无效温度单位"},
+            {"city": None, "description": "None城市名称"},
+            {"city": "A" * 101, "description": "城市名称过长"},
+        ]
+        
+        for i, error_case in enumerate(error_cases, 1):
+            try:
+                validation_result = await weather_tool.validate_input(**{k: v for k, v in error_case.items() if k != "description"})
+                if validation_result is not True:
+                    print(f"  {i}. {error_case['description']}: 验证失败 - {validation_result} ✅")
+                else:
+                    print(f"  {i}. {error_case['description']}: 意外通过验证 ❌")
+            except Exception as e:
+                print(f"  {i}. {error_case['description']}: 异常 - {str(e)} ✅")
+        
+        # 测试API调用（注意：由于使用演示密钥，会返回错误，这是预期的）
+        print("\n🌐 测试API调用（演示密钥，预期失败）:")
+        
+        demo_case = {"city": "Beijing", "country": "CN", "units": "metric"}
+        result = await weather_tool.execute_with_timeout(**demo_case)
+        
+        if result.is_error():
+            print(f"  API调用失败（预期）: {result.error_message} ✅")
+        else:
+            print(f"  API调用成功（意外）: {result.content} ❌")
+        
+        # 测试数据解析功能
+        print("\n📊 测试数据解析功能:")
+        
+        # 模拟API响应数据
+        mock_api_response = {
+            "coord": {"lon": 116.3972, "lat": 39.9075},
+            "weather": [{"id": 800, "main": "Clear", "description": "晴朗", "icon": "01d"}],
+            "main": {
+                "temp": 25.5,
+                "feels_like": 27.2,
+                "temp_min": 22.1,
+                "temp_max": 28.3,
+                "pressure": 1013,
+                "humidity": 65
+            },
+            "wind": {"speed": 3.2, "deg": 180},
+            "clouds": {"all": 10},
+            "visibility": 10000,
+            "dt": 1640995200,
+            "sys": {"country": "CN"},
+            "name": "Beijing"
+        }
+        
+        try:
+            parsed_data = weather_tool._parse_weather_data(mock_api_response, "metric")
+            print(f"  数据解析成功 ✅")
+            print(f"  城市: {parsed_data['city']}")
+            print(f"  温度: {parsed_data['temperature']}°C")
+            print(f"  描述: {parsed_data['description']}")
+            print(f"  格式化显示:")
+            print(f"    {parsed_data['formatted']}")
+        except Exception as e:
+            print(f"  数据解析失败: {str(e)} ❌")
+        
+        print("\n✅ 异步天气查询测试完成!")
+        print("\n💡 提示: 要进行真实的天气查询，请:")
+        print("  1. 注册 OpenWeatherMap 账号获取API密钥")
+        print("  2. 创建工具时传入真实的API密钥")
+        print("  3. 确保网络连接正常")
     
     # 运行测试
     asyncio.run(test_async_weather())

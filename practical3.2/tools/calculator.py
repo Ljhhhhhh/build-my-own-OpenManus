@@ -1,24 +1,20 @@
 """
-异步计算器工具 - 高级版本
+异步计算器工具
 
-这个模块实现了一个异步的计算器工具，支持基础数学运算。
-相比practical3.1，这里引入了异步执行、输入验证、错误处理等高级特性。
+这个模块实现了一个简化的异步计算器工具，支持基础数学运算。
+专注于异步编程的核心概念，移除了复杂的数学运算和高级特性。
 
 学习要点：
 1. 异步工具的具体实现
-2. 复杂输入验证
-3. 数学运算的安全处理
-4. 结构化错误信息
-5. 性能优化技巧
+2. 基础输入验证
+3. 简单的数学运算处理
+4. 错误处理的基础实践
 """
 
 import asyncio
-import math
-import operator
-from typing import Dict, Any, Union, List
-from decimal import Decimal, InvalidOperation
+from typing import Dict, Any, Union
 
-from .base import AsyncBaseTool, ToolResult, tool_timer
+from .base import AsyncBaseTool, ToolResult
 
 
 class AsyncCalculatorTool(AsyncBaseTool):
@@ -27,35 +23,8 @@ class AsyncCalculatorTool(AsyncBaseTool):
     
     💡 对比TypeScript:
     class AsyncCalculatorTool extends AsyncBaseTool {
-        private supportedOperations: Map<string, Function>;
-        
         constructor() {
-            super("async_calculator", "异步计算器工具", 10.0, 2);
-            
-            this.supportedOperations = new Map([
-                ['add', (a: number, b: number) => a + b],
-                ['subtract', (a: number, b: number) => a - b],
-                ['multiply', (a: number, b: number) => a * b],
-                ['divide', (a: number, b: number) => {
-                    if (b === 0) throw new Error("除数不能为零");
-                    return a / b;
-                }],
-                ['power', (a: number, b: number) => Math.pow(a, b)],
-                ['sqrt', (a: number) => {
-                    if (a < 0) throw new Error("不能计算负数的平方根");
-                    return Math.sqrt(a);
-                }],
-                ['factorial', (a: number) => {
-                    if (a < 0 || !Number.isInteger(a)) {
-                        throw new Error("阶乘只能计算非负整数");
-                    }
-                    let result = 1;
-                    for (let i = 2; i <= a; i++) {
-                        result *= i;
-                    }
-                    return result;
-                }]
-            ]);
+            super("async_calculator", "异步计算器工具", 10.0);
         }
         
         get schema(): object {
@@ -64,40 +33,73 @@ class AsyncCalculatorTool(AsyncBaseTool):
                 properties: {
                     operation: {
                         type: "string",
-                        enum: Array.from(this.supportedOperations.keys()),
+                        enum: ["add", "subtract", "multiply", "divide"],
                         description: "要执行的数学运算"
                     },
-                    operands: {
-                        type: "array",
-                        items: { type: "number" },
-                        description: "运算数"
-                    },
-                    precision: {
-                        type: "integer",
-                        minimum: 0,
-                        maximum: 10,
-                        default: 2,
-                        description: "结果精度（小数位数）"
-                    }
+                    a: { type: "number", description: "第一个数" },
+                    b: { type: "number", description: "第二个数" }
                 },
-                required: ["operation", "operands"]
+                required: ["operation", "a", "b"]
             };
         }
         
         async validateInput(params: any): Promise<boolean | string> {
-            // 验证逻辑
+            const { operation, a, b } = params;
+            
+            if (!["add", "subtract", "multiply", "divide"].includes(operation)) {
+                return "不支持的运算类型";
+            }
+            
+            if (typeof a !== "number" || typeof b !== "number") {
+                return "操作数必须是数字";
+            }
+            
+            if (operation === "divide" && b === 0) {
+                return "除数不能为零";
+            }
+            
+            return true;
         }
         
         async execute(params: any): Promise<ToolResult> {
-            // 执行逻辑
+            const { operation, a, b } = params;
+            
+            // 模拟异步操作
+            await new Promise(resolve => setTimeout(resolve, 100));
+            
+            let result: number;
+            
+            switch (operation) {
+                case "add":
+                    result = a + b;
+                    break;
+                case "subtract":
+                    result = a - b;
+                    break;
+                case "multiply":
+                    result = a * b;
+                    break;
+                case "divide":
+                    result = a / b;
+                    break;
+                default:
+                    return ToolResult.error(`不支持的运算: ${operation}`);
+            }
+            
+            return ToolResult.success({
+                operation,
+                operands: [a, b],
+                result,
+                expression: `${a} ${operation} ${b} = ${result}`
+            });
         }
     }
     
     学习要点：
     - 异步工具的完整实现
-    - 复杂业务逻辑的处理
-    - 数学运算的安全实现
-    - 错误处理的最佳实践
+    - 基础业务逻辑的处理
+    - 简单的数学运算实现
+    - 错误处理的基础实践
     """
     
     def __init__(self):
@@ -105,228 +107,110 @@ class AsyncCalculatorTool(AsyncBaseTool):
         初始化异步计算器工具
         
         学习要点：
-        - 工具的初始化配置
-        - 支持操作的定义
-        - 运算符映射的设计
+        - 继承基类的正确方式
+        - 工具属性的设置
+        - 超时时间的合理配置
         """
         super().__init__(
             name="async_calculator",
-            description="异步计算器工具，支持基础数学运算",
-            timeout=10.0,
-            max_retries=2
+            description="异步计算器工具，支持基础四则运算",
+            timeout=10.0
         )
         
-        # 支持的运算操作
+        # 支持的运算类型
         self.supported_operations = {
-            'add': self._add,
-            'subtract': self._subtract,
-            'multiply': self._multiply,
-            'divide': self._divide,
-            'power': self._power,
-            'sqrt': self._sqrt,
-            'factorial': self._factorial,
-            'sin': self._sin,
-            'cos': self._cos,
-            'tan': self._tan,
-            'log': self._log,
-            'ln': self._ln,
-            'abs': self._abs,
-            'round': self._round,
-            'ceil': self._ceil,
-            'floor': self._floor
+            "add": self._add,
+            "subtract": self._subtract,
+            "multiply": self._multiply,
+            "divide": self._divide
         }
     
     @property
     def schema(self) -> Dict[str, Any]:
         """
-        返回计算器工具的JSON Schema
+        定义工具的输入参数模式
         
         学习要点：
-        - 复杂Schema的设计
-        - 枚举值的定义
-        - 条件验证的表达
-        - 默认值的设置
+        - JSON Schema 的基础使用
+        - 枚举类型的定义
+        - 必需参数的指定
+        - 参数描述的重要性
         
         Returns:
-            Dict[str, Any]: JSON Schema
+            Dict[str, Any]: JSON Schema 格式的参数定义
         """
         return {
             "type": "object",
             "properties": {
                 "operation": {
                     "type": "string",
-                    "enum": list(self.supported_operations.keys()),
-                    "description": "要执行的数学运算"
+                    "enum": ["add", "subtract", "multiply", "divide"],
+                    "description": "要执行的数学运算类型"
                 },
-                "operands": {
-                    "type": "array",
-                    "items": {"type": "number"},
-                    "minItems": 1,
-                    "maxItems": 10,
-                    "description": "运算数（根据操作类型需要不同数量的操作数）"
+                "a": {
+                    "type": "number",
+                    "description": "第一个操作数"
                 },
-                "precision": {
-                    "type": "integer",
-                    "minimum": 0,
-                    "maximum": 10,
-                    "default": 2,
-                    "description": "结果精度（小数位数）"
-                },
-                "use_decimal": {
-                    "type": "boolean",
-                    "default": False,
-                    "description": "是否使用高精度小数运算"
+                "b": {
+                    "type": "number",
+                    "description": "第二个操作数"
                 }
             },
-            "required": ["operation", "operands"],
-            "additionalProperties": False
+            "required": ["operation", "a", "b"]
         }
     
     async def validate_input(self, **kwargs) -> Union[bool, str]:
         """
-        异步输入验证
-        
-        💡 对比TypeScript:
-        async validateInput(params: any): Promise<boolean | string> {
-            // 基础验证
-            if (!params.operation || !params.operands) {
-                return "缺少必需的参数：operation 和 operands";
-            }
-            
-            // 操作验证
-            if (!this.supportedOperations.has(params.operation)) {
-                return `不支持的操作: ${params.operation}`;
-            }
-            
-            // 操作数验证
-            if (!Array.isArray(params.operands) || params.operands.length === 0) {
-                return "operands 必须是非空数组";
-            }
-            
-            // 操作数数量验证
-            const requiredOperands = this.getRequiredOperandCount(params.operation);
-            if (params.operands.length !== requiredOperands) {
-                return `操作 ${params.operation} 需要 ${requiredOperands} 个操作数`;
-            }
-            
-            // 数值验证
-            for (const operand of params.operands) {
-                if (typeof operand !== 'number' || !isFinite(operand)) {
-                    return `无效的操作数: ${operand}`;
-                }
-            }
-            
-            // 特殊验证
-            return await this.validateSpecialCases(params);
-        }
+        验证输入参数
         
         学习要点：
-        - 多层次的输入验证
-        - 异步验证的实现
-        - 特殊情况的处理
-        - 详细错误信息的提供
+        - 异步验证方法的实现
+        - 参数存在性检查
+        - 参数类型验证
+        - 业务逻辑验证（如除零检查）
         
         Args:
             **kwargs: 输入参数
             
         Returns:
-            Union[bool, str]: 验证结果
+            Union[bool, str]: True表示验证通过，字符串表示错误信息
         """
-        # 基础参数检查
-        operation = kwargs.get('operation')
-        operands = kwargs.get('operands')
+        # 调用基类的基础验证
+        base_validation = await super().validate_input(**kwargs)
+        if base_validation is not True:
+            return base_validation
         
-        if not operation:
-            return "缺少必需的参数：operation"
+        operation = kwargs.get("operation")
+        a = kwargs.get("a")
+        b = kwargs.get("b")
         
-        if not operands:
-            return "缺少必需的参数：operands"
-        
-        # 操作类型验证
+        # 验证运算类型
         if operation not in self.supported_operations:
-            return f"不支持的操作: {operation}。支持的操作: {', '.join(self.supported_operations.keys())}"
+            return f"不支持的运算类型: {operation}。支持的运算: {list(self.supported_operations.keys())}"
         
-        # 操作数类型和格式验证
-        if not isinstance(operands, list):
-            return "operands 必须是数组"
+        # 验证操作数类型
+        if not isinstance(a, (int, float)):
+            return "参数 'a' 必须是数字类型"
         
-        if len(operands) == 0:
-            return "operands 不能为空"
+        if not isinstance(b, (int, float)):
+            return "参数 'b' 必须是数字类型"
         
-        if len(operands) > 10:
-            return "operands 数量不能超过10个"
+        # 特殊情况验证：除零检查
+        if operation == "divide" and b == 0:
+            return "除数不能为零"
         
-        # 验证每个操作数
-        for i, operand in enumerate(operands):
-            if not isinstance(operand, (int, float)):
-                return f"操作数 {i+1} 必须是数字，当前类型: {type(operand).__name__}"
-            
-            if not math.isfinite(operand):
-                return f"操作数 {i+1} 必须是有限数字（不能是无穷大或NaN）"
-        
-        # 操作数数量验证
-        required_count = self._get_required_operand_count(operation)
-        if len(operands) != required_count:
-            return f"操作 '{operation}' 需要 {required_count} 个操作数，但提供了 {len(operands)} 个"
-        
-        # 精度参数验证
-        precision = kwargs.get('precision', 2)
-        if not isinstance(precision, int) or precision < 0 or precision > 10:
-            return "precision 必须是0-10之间的整数"
-        
-        # 特殊情况验证
-        return await self._validate_special_cases(operation, operands)
+        return True
     
-    @tool_timer
     async def execute(self, **kwargs) -> ToolResult:
         """
-        异步执行计算
-        
-        💡 对比TypeScript:
-        @toolTimer
-        async execute(params: any): Promise<ToolResult> {
-            try {
-                const { operation, operands, precision = 2, use_decimal = false } = params;
-                
-                // 获取操作函数
-                const operationFunc = this.supportedOperations.get(operation);
-                if (!operationFunc) {
-                    return ToolResult.error(`操作 ${operation} 未实现`);
-                }
-                
-                // 执行计算
-                let result: number;
-                if (use_decimal) {
-                    result = await this.executeWithDecimal(operationFunc, operands);
-                } else {
-                    result = await operationFunc(...operands);
-                }
-                
-                // 格式化结果
-                const formattedResult = this.formatResult(result, precision);
-                
-                // 构建元数据
-                const metadata = {
-                    operation,
-                    operands,
-                    precision,
-                    use_decimal,
-                    raw_result: result
-                };
-                
-                return ToolResult.success(formattedResult, metadata);
-                
-            } catch (error) {
-                return ToolResult.error(`计算错误: ${error.message}`);
-            }
-        }
+        执行计算操作
         
         学习要点：
         - 异步方法的实现
-        - 装饰器的使用
-        - 错误处理的完整性
-        - 结果格式化的处理
-        - 元数据的构建
+        - 参数提取和处理
+        - 业务逻辑的执行
+        - 结果的构建和返回
+        - 异常处理的实现
         
         Args:
             **kwargs: 执行参数
@@ -335,69 +219,44 @@ class AsyncCalculatorTool(AsyncBaseTool):
             ToolResult: 执行结果
         """
         try:
-            operation = kwargs['operation']
-            operands = kwargs['operands']
-            precision = kwargs.get('precision', 2)
-            use_decimal = kwargs.get('use_decimal', False)
+            operation = kwargs["operation"]
+            a = kwargs["a"]
+            b = kwargs["b"]
             
-            # 获取操作函数
+            # 模拟异步操作（实际场景中可能是数据库查询、网络请求等）
+            await asyncio.sleep(0.1)
+            
+            # 获取对应的运算函数
             operation_func = self.supported_operations[operation]
             
-            # 模拟异步计算（对于复杂运算可能需要时间）
-            if operation in ['factorial', 'power'] and operands[0] > 1000:
-                await asyncio.sleep(0.1)  # 模拟复杂计算的延迟
+            # 执行运算
+            result = await operation_func(a, b)
             
-            # 执行计算
-            if use_decimal:
-                result = await self._execute_with_decimal(operation_func, operands)
-            else:
-                result = await operation_func(*operands)
-            
-            # 格式化结果
-            formatted_result = self._format_result(result, precision)
-            
-            # 构建元数据
-            metadata = {
-                'operation': operation,
-                'operands': operands,
-                'precision': precision,
-                'use_decimal': use_decimal,
-                'raw_result': float(result) if isinstance(result, Decimal) else result,
-                'formatted_result': formatted_result
-            }
-            
-            return ToolResult.success(
-                content=formatted_result,
-                metadata=metadata
-            )
+            # 构建返回结果
+            return ToolResult.success({
+                "operation": operation,
+                "operands": [a, b],
+                "result": result,
+                "expression": f"{a} {operation} {b} = {result}",
+                "formatted": self._format_result(operation, a, b, result)
+            })
             
         except ZeroDivisionError:
-            return ToolResult.error("数学错误：除数不能为零")
-        
-        except ValueError as e:
-            return ToolResult.error(f"数值错误：{str(e)}")
-        
-        except OverflowError:
-            return ToolResult.error("数学错误：结果溢出")
-        
+            return ToolResult.error("除数不能为零")
         except Exception as e:
-            return ToolResult.error(f"计算异常：{str(e)}")
+            return ToolResult.error(f"计算过程中发生错误: {str(e)}")
     
-    # 数学运算方法
-    async def _add(self, *operands) -> float:
+    async def _add(self, a: float, b: float) -> float:
         """加法运算"""
-        return sum(operands)
+        return a + b
     
     async def _subtract(self, a: float, b: float) -> float:
         """减法运算"""
         return a - b
     
-    async def _multiply(self, *operands) -> float:
+    async def _multiply(self, a: float, b: float) -> float:
         """乘法运算"""
-        result = 1
-        for operand in operands:
-            result *= operand
-        return result
+        return a * b
     
     async def _divide(self, a: float, b: float) -> float:
         """除法运算"""
@@ -405,307 +264,151 @@ class AsyncCalculatorTool(AsyncBaseTool):
             raise ZeroDivisionError("除数不能为零")
         return a / b
     
-    async def _power(self, a: float, b: float) -> float:
-        """幂运算"""
-        try:
-            return math.pow(a, b)
-        except OverflowError:
-            raise OverflowError("幂运算结果溢出")
-    
-    async def _sqrt(self, a: float) -> float:
-        """平方根运算"""
-        if a < 0:
-            raise ValueError("不能计算负数的平方根")
-        return math.sqrt(a)
-    
-    async def _factorial(self, a: float) -> float:
-        """阶乘运算"""
-        if a < 0:
-            raise ValueError("阶乘不能计算负数")
-        if not float(a).is_integer():
-            raise ValueError("阶乘只能计算整数")
-        if a > 170:  # 防止溢出
-            raise OverflowError("阶乘输入过大，会导致溢出")
-        
-        return float(math.factorial(int(a)))
-    
-    async def _sin(self, a: float) -> float:
-        """正弦函数"""
-        return math.sin(a)
-    
-    async def _cos(self, a: float) -> float:
-        """余弦函数"""
-        return math.cos(a)
-    
-    async def _tan(self, a: float) -> float:
-        """正切函数"""
-        return math.tan(a)
-    
-    async def _log(self, a: float) -> float:
-        """常用对数（以10为底）"""
-        if a <= 0:
-            raise ValueError("对数的真数必须大于0")
-        return math.log10(a)
-    
-    async def _ln(self, a: float) -> float:
-        """自然对数（以e为底）"""
-        if a <= 0:
-            raise ValueError("对数的真数必须大于0")
-        return math.log(a)
-    
-    async def _abs(self, a: float) -> float:
-        """绝对值"""
-        return abs(a)
-    
-    async def _round(self, a: float) -> float:
-        """四舍五入"""
-        return round(a)
-    
-    async def _ceil(self, a: float) -> float:
-        """向上取整"""
-        return math.ceil(a)
-    
-    async def _floor(self, a: float) -> float:
-        """向下取整"""
-        return math.floor(a)
-    
-    def _get_required_operand_count(self, operation: str) -> int:
-        """
-        获取操作所需的操作数数量
-        
-        学习要点：
-        - 操作映射的设计
-        - 参数数量的验证
-        - 字典查找的使用
-        
-        Args:
-            operation: 操作名称
-            
-        Returns:
-            int: 所需操作数数量
-        """
-        operand_counts = {
-            'add': -1,  # -1 表示可变数量（至少1个）
-            'subtract': 2,
-            'multiply': -1,  # 可变数量
-            'divide': 2,
-            'power': 2,
-            'sqrt': 1,
-            'factorial': 1,
-            'sin': 1,
-            'cos': 1,
-            'tan': 1,
-            'log': 1,
-            'ln': 1,
-            'abs': 1,
-            'round': 1,
-            'ceil': 1,
-            'floor': 1
-        }
-        
-        count = operand_counts.get(operation, 1)
-        return 1 if count == -1 else count  # 对于可变数量，至少需要1个
-    
-    async def _validate_special_cases(self, operation: str, operands: List[float]) -> Union[bool, str]:
-        """
-        验证特殊情况
-        
-        学习要点：
-        - 特殊情况的识别和处理
-        - 异步验证的实现
-        - 业务逻辑的验证
-        
-        Args:
-            operation: 操作名称
-            operands: 操作数列表
-            
-        Returns:
-            Union[bool, str]: 验证结果
-        """
-        # 除法验证
-        if operation == 'divide' and operands[1] == 0:
-            return "除数不能为零"
-        
-        # 平方根验证
-        if operation == 'sqrt' and operands[0] < 0:
-            return "不能计算负数的平方根"
-        
-        # 阶乘验证
-        if operation == 'factorial':
-            if operands[0] < 0:
-                return "阶乘不能计算负数"
-            if not float(operands[0]).is_integer():
-                return "阶乘只能计算整数"
-            if operands[0] > 170:
-                return "阶乘输入过大（>170），会导致溢出"
-        
-        # 对数验证
-        if operation in ['log', 'ln'] and operands[0] <= 0:
-            return "对数的真数必须大于0"
-        
-        # 幂运算验证
-        if operation == 'power':
-            if operands[0] == 0 and operands[1] < 0:
-                return "0不能进行负数次幂运算"
-            if abs(operands[0]) > 1000 and operands[1] > 10:
-                return "幂运算可能导致溢出"
-        
-        return True
-    
-    async def _execute_with_decimal(self, operation_func, operands: List[float]) -> Decimal:
-        """
-        使用高精度小数执行计算
-        
-        学习要点：
-        - Decimal类的使用
-        - 高精度计算的实现
-        - 类型转换的处理
-        
-        Args:
-            operation_func: 操作函数
-            operands: 操作数列表
-            
-        Returns:
-            Decimal: 高精度计算结果
-        """
-        try:
-            # 转换为Decimal类型
-            decimal_operands = [Decimal(str(op)) for op in operands]
-            
-            # 执行计算（注意：这里需要适配Decimal类型）
-            # 简化实现，实际应该为每个操作提供Decimal版本
-            result = await operation_func(*operands)
-            return Decimal(str(result))
-            
-        except InvalidOperation as e:
-            raise ValueError(f"高精度计算错误: {str(e)}")
-    
-    def _format_result(self, result: Union[float, Decimal], precision: int) -> str:
+    def _format_result(self, operation: str, a: float, b: float, result: float) -> str:
         """
         格式化计算结果
         
         学习要点：
-        - 数值格式化的处理
-        - 精度控制的实现
-        - 字符串格式化技巧
+        - 字符串格式化的使用
+        - 运算符映射
+        - 结果展示的优化
         
         Args:
+            operation: 运算类型
+            a: 第一个操作数
+            b: 第二个操作数
             result: 计算结果
-            precision: 精度（小数位数）
             
         Returns:
-            str: 格式化后的结果
+            str: 格式化后的结果字符串
         """
-        if isinstance(result, Decimal):
-            return f"{result:.{precision}f}"
+        operation_symbols = {
+            "add": "+",
+            "subtract": "-",
+            "multiply": "×",
+            "divide": "÷"
+        }
         
-        # 处理整数结果
-        if isinstance(result, float) and result.is_integer():
-            return str(int(result))
+        symbol = operation_symbols.get(operation, operation)
         
-        # 处理小数结果
-        return f"{result:.{precision}f}".rstrip('0').rstrip('.')
+        # 格式化数字显示（去除不必要的小数点）
+        def format_number(num):
+            if isinstance(num, float) and num.is_integer():
+                return str(int(num))
+            return str(num)
+        
+        formatted_a = format_number(a)
+        formatted_b = format_number(b)
+        formatted_result = format_number(result)
+        
+        return f"{formatted_a} {symbol} {formatted_b} = {formatted_result}"
 
 
 # 测试代码
 if __name__ == "__main__":
-    """
-    测试异步计算器工具
-    
-    学习要点：
-    - 异步工具的测试方法
-    - 各种运算的测试用例
-    - 错误情况的测试
-    """
+    import asyncio
     
     async def test_async_calculator():
-        """测试异步计算器"""
-        print("🧪 测试异步计算器工具")
+        """
+        测试异步计算器功能
+        
+        学习要点：
+        - 异步测试的编写
+        - 多种测试用例的设计
+        - 错误情况的测试
+        - 结果验证的方法
+        """
+        print("🧮 测试异步计算器工具")
         print("=" * 40)
         
+        # 创建计算器实例
         calculator = AsyncCalculatorTool()
+        print(f"工具信息: {calculator}")
+        print(f"支持的运算: {list(calculator.supported_operations.keys())}")
         
         # 测试用例
         test_cases = [
-            # 基础运算
-            {"operation": "add", "operands": [10, 20, 30], "expected": "60"},
-            {"operation": "subtract", "operands": [100, 25], "expected": "75"},
-            {"operation": "multiply", "operands": [6, 7], "expected": "42"},
-            {"operation": "divide", "operands": [84, 12], "expected": "7"},
-            
-            # 高级运算
-            {"operation": "power", "operands": [2, 8], "expected": "256"},
-            {"operation": "sqrt", "operands": [16], "expected": "4"},
-            {"operation": "factorial", "operands": [5], "expected": "120"},
-            
-            # 三角函数
-            {"operation": "sin", "operands": [0], "expected": "0"},
-            {"operation": "cos", "operands": [0], "expected": "1"},
-            
-            # 对数函数
-            {"operation": "log", "operands": [100], "expected": "2"},
-            {"operation": "ln", "operands": [math.e], "expected": "1"},
-            
-            # 其他函数
-            {"operation": "abs", "operands": [-42], "expected": "42"},
-            {"operation": "round", "operands": [3.7], "expected": "4"},
-            {"operation": "ceil", "operands": [3.2], "expected": "4"},
-            {"operation": "floor", "operands": [3.8], "expected": "3"}
+            {"operation": "add", "a": 10, "b": 5, "expected": 15},
+            {"operation": "subtract", "a": 10, "b": 3, "expected": 7},
+            {"operation": "multiply", "a": 4, "b": 6, "expected": 24},
+            {"operation": "divide", "a": 15, "b": 3, "expected": 5},
+            {"operation": "divide", "a": 10, "b": 3, "expected": 3.3333333333333335},
         ]
         
-        print("\n1. 测试基础运算:")
-        for i, test_case in enumerate(test_cases[:4]):
-            result = await calculator.execute_with_timeout(**test_case)
-            status = "✅" if result.is_success() else "❌"
-            print(f"  {status} {test_case['operation']}: {result.content}")
-        
-        print("\n2. 测试高级运算:")
-        for i, test_case in enumerate(test_cases[4:7]):
-            result = await calculator.execute_with_timeout(**test_case)
-            status = "✅" if result.is_success() else "❌"
-            print(f"  {status} {test_case['operation']}: {result.content}")
-        
-        print("\n3. 测试数学函数:")
-        for i, test_case in enumerate(test_cases[7:]):
-            result = await calculator.execute_with_timeout(**test_case)
-            status = "✅" if result.is_success() else "❌"
-            print(f"  {status} {test_case['operation']}: {result.content}")
+        print("\n🧪 测试正常运算:")
+        for i, test_case in enumerate(test_cases, 1):
+            operation = test_case["operation"]
+            a = test_case["a"]
+            b = test_case["b"]
+            expected = test_case["expected"]
+            
+            result = await calculator.execute_with_timeout(
+                operation=operation, a=a, b=b
+            )
+            
+            if result.is_success():
+                actual = result.content["result"]
+                formatted = result.content["formatted"]
+                status = "✅" if abs(actual - expected) < 1e-10 else "❌"
+                print(f"  {i}. {formatted} {status}")
+                if abs(actual - expected) >= 1e-10:
+                    print(f"     期望: {expected}, 实际: {actual}")
+            else:
+                print(f"  {i}. 错误: {result.error_message} ❌")
         
         # 测试错误情况
-        print("\n4. 测试错误处理:")
+        print("\n🚫 测试错误情况:")
+        
         error_cases = [
-            {"operation": "divide", "operands": [10, 0], "expected_error": "除数不能为零"},
-            {"operation": "sqrt", "operands": [-4], "expected_error": "负数的平方根"},
-            {"operation": "factorial", "operands": [-1], "expected_error": "阶乘不能计算负数"},
-            {"operation": "log", "operands": [0], "expected_error": "对数的真数必须大于0"}
+            {"operation": "divide", "a": 10, "b": 0, "description": "除零错误"},
+            {"operation": "invalid", "a": 1, "b": 2, "description": "无效运算"},
+            {"operation": "add", "a": "not_number", "b": 2, "description": "无效操作数类型"},
         ]
         
-        for error_case in error_cases:
-            result = await calculator.execute_with_timeout(**error_case)
-            status = "✅" if not result.is_success() else "❌"
-            print(f"  {status} 错误处理 - {error_case['operation']}: {result.error_message}")
+        for i, error_case in enumerate(error_cases, 1):
+            try:
+                # 先测试输入验证
+                validation_result = await calculator.validate_input(**error_case)
+                if validation_result is not True:
+                    print(f"  {i}. {error_case['description']}: 输入验证失败 - {validation_result} ✅")
+                    continue
+                
+                # 如果验证通过，测试执行
+                result = await calculator.execute_with_timeout(**error_case)
+                if result.is_error():
+                    print(f"  {i}. {error_case['description']}: 执行失败 - {result.error_message} ✅")
+                else:
+                    print(f"  {i}. {error_case['description']}: 意外成功 ❌")
+                    
+            except Exception as e:
+                print(f"  {i}. {error_case['description']}: 异常 - {str(e)} ✅")
         
-        # 测试输入验证
-        print("\n5. 测试输入验证:")
-        validation_cases = [
-            {"operation": "invalid_op", "operands": [1, 2]},
-            {"operation": "add", "operands": []},
-            {"operation": "divide", "operands": [1]},  # 缺少操作数
-            {"operation": "add", "operands": ["not_a_number", 2]}
-        ]
+        # 测试性能
+        print("\n⚡ 测试执行性能:")
+        import time
         
-        for validation_case in validation_cases:
-            validation_result = await calculator.validate_input(**validation_case)
-            status = "✅" if validation_result is not True else "❌"
-            print(f"  {status} 验证失败: {validation_result}")
+        start_time = time.time()
+        tasks = []
         
-        # 显示工具统计
-        print("\n6. 工具统计:")
-        stats = calculator.get_stats()
-        for key, value in stats.items():
-            print(f"  {key}: {value}")
+        # 并发执行多个计算任务
+        for i in range(10):
+            task = calculator.execute_with_timeout(
+                operation="multiply", a=i, b=i+1
+            )
+            tasks.append(task)
         
-        print("\n✅ 异步计算器工具测试完成！")
+        results = await asyncio.gather(*tasks)
+        end_time = time.time()
+        
+        successful_count = sum(1 for r in results if r.is_success())
+        total_time = end_time - start_time
+        
+        print(f"  并发执行10个任务:")
+        print(f"  - 成功: {successful_count}/10")
+        print(f"  - 总时间: {total_time:.3f}秒")
+        print(f"  - 平均时间: {total_time/10:.3f}秒/任务")
+        
+        print("\n✅ 异步计算器测试完成!")
     
     # 运行测试
     asyncio.run(test_async_calculator())

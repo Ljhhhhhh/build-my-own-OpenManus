@@ -35,7 +35,7 @@ from .base import AsyncBaseTool, ToolResult, ToolResultStatus
 from .manager import AsyncToolManager
 from .calculator import AsyncCalculatorTool
 from .weather import AsyncWeatherTool
-from .utils import setup_logging, format_duration, retry_async
+from .utils import setup_logging, format_duration
 
 # 包信息
 __version__ = "1.0.0"
@@ -44,22 +44,21 @@ __author__ = "Practical Learning Project"
 
 # 导出的主要类和函数
 __all__ = [
-    # 核心基类
+    # 基础类和枚举
     'AsyncBaseTool',
     'ToolResult', 
     'ToolResultStatus',
     
-    # 管理器
+    # 工具管理器
     'AsyncToolManager',
     
-    # 具体工具
+    # 具体工具实现
     'AsyncCalculatorTool',
     'AsyncWeatherTool',
     
     # 工具函数
     'setup_logging',
     'format_duration',
-    'retry_async',
     
     # 包信息
     '__version__',

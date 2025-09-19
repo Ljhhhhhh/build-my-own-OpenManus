@@ -1,0 +1,19 @@
+2025-09-19 16:48:02 - practical4.demo - ERROR - 配置加载失败: Config.__init__() missing 1 required positional argument: 'openai_api_key'
+2025-09-19 16:50:39 - practical4.demo - INFO - 配置加载成功
+2025-09-19 16:50:39 - practical4.demo - INFO - 正在初始化工具调用代理...
+2025-09-19 16:50:39 - practical4.demo - ERROR - 代理初始化失败: The api_key client option must be set either by passing api_key to the client or by setting the OPENAI_API_KEY environment variable
+2025-09-19 16:53:51 - practical4.demo - INFO - 配置加载成功
+2025-09-19 16:53:51 - practical4.demo - INFO - 正在初始化工具调用代理...
+2025-09-19 16:53:51 - practical4.demo - ERROR - 代理初始化失败: The api_key client option must be set either by passing api_key to the client or by setting the OPENAI_API_KEY environment variable
+2025-09-19 17:08:01 - practical4.demo - INFO - 配置加载成功
+2025-09-19 17:08:01 - practical4.demo - INFO - 正在初始化工具调用代理...
+2025-09-19 17:08:02 - practical4.demo - INFO - 代理初始化完成
+2025-09-19 17:12:26 - practical4.demo - INFO - 配置加载成功
+2025-09-19 17:12:26 - practical4.demo - INFO - 正在初始化工具调用代理...
+2025-09-19 17:12:27 - practical4.demo - INFO - 代理初始化完成
+2025-09-19 17:18:26 - practical4.demo - INFO - 配置加载成功
+2025-09-19 17:18:26 - practical4.demo - INFO - 正在初始化工具调用代理...
+2025-09-19 17:18:27 - practical4.demo - INFO - 代理初始化完成
+2025-09-19 17:20:01 - practical4.demo - INFO - 配置加载成功
+2025-09-19 17:20:01 - practical4.demo - INFO - 正在初始化工具调用代理...
+2025-09-19 17:20:01 - practical4.demo - INFO - 代理初始化完成

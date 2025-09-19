@@ -291,10 +291,7 @@ class ToolFrameworkDemo:
             self.run_basic_demo()
             
             # 错误处理演示
-            # self.run_error_handling_demo()
-            
-            # 显示统计信息
-            self.manager.print_stats()
+            self.run_error_handling_demo()
             
             # 询问是否运行交互式演示
             print("\n" + "=" * 50)

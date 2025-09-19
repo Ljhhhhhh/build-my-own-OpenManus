@@ -1,4 +1,4 @@
-# Practical 3.2 - 高级工具集成系统依赖
+# Practical 3.2 - 异步工具系统基础依赖
 
 # 核心依赖
 pydantic>=2.0.0          # 数据验证和序列化
@@ -6,13 +6,9 @@ typing-extensions>=4.0.0  # 类型注解扩展
 
 # 异步HTTP客户端
 aiohttp>=3.8.0           # 异步HTTP客户端库
-aiofiles>=23.0.0         # 异步文件操作
 
 # 环境变量管理
 python-dotenv>=1.0.0     # .env文件支持
-
-# 日志和调试
-colorlog>=6.7.0          # 彩色日志输出
 
 # 开发工具 (可选)
 pytest>=7.0.0            # 测试框架

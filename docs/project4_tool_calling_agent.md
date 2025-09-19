@@ -16,19 +16,18 @@ from typing import List, Dict, Any, Optional
 import openai
 from tools.manager import ToolManager, ToolResult, ToolResultStatus
 from tools.calculator import CalculatorTool
-from tools.weather import WeatherTool
+from tools.text_processor import TextProcessorTool
 
 class ToolCallingAgent:
     """工具调用代理"""
 
-    def __init__(self, api_key: str, weather_api_key: str = None):
+    def __init__(self, api_key: str):
         self.client = openai.AsyncOpenAI(api_key=api_key)
         self.tool_manager = ToolManager()
 
         # 注册基础工具
         self.tool_manager.register_tool(CalculatorTool())
-        if weather_api_key:
-            self.tool_manager.register_tool(WeatherTool(weather_api_key))
+        self.tool_manager.register_tool(TextProcessorTool())
 
         self.conversation_history = [
             {
@@ -148,10 +147,7 @@ json
 
 # 使用示例
 async def main():
-    agent = ToolCallingAgent(
-        api_key="your-openai-api-key",
-        weather_api_key="your-weather-api-key"
-    )
+    agent = ToolCallingAgent(api_key="your-openai-api-key")
 
     print("工具调用代理已启动！")
     print("可用工具：")
@@ -171,7 +167,109 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
-````
+```
+
+#### 文本处理工具实现
+
+```python
+# tools/text_processor.py
+from typing import Dict, Any
+from .base import BaseTool, ToolResult, ToolResultStatus
+
+class TextProcessorTool(BaseTool):
+    """文本处理工具 - 提供多种文本操作功能"""
+
+    def __init__(self):
+        super().__init__(
+            name="text_processor",
+            description="文本处理工具，支持字符统计、大小写转换、文本反转等操作"
+        )
+
+    async def execute(self, **kwargs) -> ToolResult:
+        """执行文本处理操作"""
+        try:
+            text = kwargs.get("text", "")
+            operation = kwargs.get("operation", "count")
+
+            if not text:
+                return ToolResult(
+                    status=ToolResultStatus.ERROR,
+                    content="请提供要处理的文本"
+                )
+
+            result = self._process_text(text, operation)
+            
+            return ToolResult(
+                status=ToolResultStatus.SUCCESS,
+                content=result
+            )
+
+        except Exception as e:
+            return ToolResult(
+                status=ToolResultStatus.ERROR,
+                content=f"文本处理失败：{str(e)}"
+            )
+
+    def _process_text(self, text: str, operation: str) -> str:
+        """处理文本的核心逻辑"""
+        operations = {
+            "count": self._count_characters,
+            "upper": lambda t: t.upper(),
+            "lower": lambda t: t.lower(),
+            "reverse": lambda t: t[::-1],
+            "words": self._count_words,
+            "title": lambda t: t.title()
+        }
+
+        if operation not in operations:
+            available_ops = ", ".join(operations.keys())
+            return f"不支持的操作。可用操作：{available_ops}"
+
+        if operation in ["count", "words"]:
+            return operations[operation](text)
+        else:
+            return operations[operation](text)
+
+    def _count_characters(self, text: str) -> str:
+        """统计字符数"""
+        char_count = len(text)
+        char_count_no_spaces = len(text.replace(" ", ""))
+        return f"总字符数：{char_count}，不含空格：{char_count_no_spaces}"
+
+    def _count_words(self, text: str) -> str:
+        """统计单词数"""
+        words = text.split()
+        return f"单词数：{len(words)}"
+
+    def get_parameters_schema(self) -> Dict[str, Any]:
+        """获取参数模式"""
+        return {
+            "text": {
+                "type": "string",
+                "description": "要处理的文本内容",
+                "required": True
+            },
+            "operation": {
+                "type": "string",
+                "description": "操作类型：count(字符统计)、upper(转大写)、lower(转小写)、reverse(反转)、words(单词统计)、title(标题格式)",
+                "required": False,
+                "default": "count"
+            }
+        }
+```
+
+#### 使用示例对话
+
+```
+你: 帮我统计一下"Hello World"有多少个字符
+代理: 我使用了text_processor工具，结果是：总字符数：11，不含空格：10
+
+你: 把"hello world"转换成大写
+代理: 我使用了text_processor工具，结果是：HELLO WORLD
+
+你: 计算 2 + 3 * 4
+代理: 我使用了calculator工具，结果是：14
+```
 
 #### 学习要点
 
@@ -179,3 +277,23 @@ if __name__ == "__main__":
 2. **智能选择**：让 LLM 决定何时使用工具
 3. **结果处理**：处理工具执行结果并生成回复
 4. **对话管理**：维护包含工具调用的对话历史
+
+#### 为什么选择文本处理工具？
+
+相比天气工具，文本处理工具有以下教学优势：
+
+1. **无需外部API**：不依赖第三方服务，避免API密钥管理的复杂性
+2. **功能直观**：文本操作结果立即可见，便于理解工具调用流程
+3. **参数简单**：只需文本和操作类型两个参数，降低学习门槛
+4. **扩展性强**：可以轻松添加更多文本处理功能
+5. **调试友好**：出错时容易定位问题，适合初学者
+
+#### 扩展建议
+
+你可以为文本处理工具添加更多功能：
+
+- 文本加密/解密
+- 正则表达式匹配
+- 文本格式化（JSON、XML等）
+- 语言检测
+- 文本摘要生成
