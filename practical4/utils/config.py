@@ -4,9 +4,7 @@
 这个模块负责管理应用程序的配置，包括：
 1. 环境变量的读取和验证
 2. .env文件的支持
-3. 环境感知配置（dev/test/prod）
-4. 配置的类型检查和验证
-5. 配置优先级处理
+3. 配置的类型检查和验证
 
 学习要点：
 - 环境变量的最佳实践
@@ -14,16 +12,14 @@
 - 配置类的设计模式
 - 类型注解和验证
 - 单例模式的应用
-- 环境感知配置
 """
 
 import os
-from typing import Optional, Dict, Any, Union, List
+from typing import Optional, Dict, Any, List
 from dataclasses import dataclass, field
 from pathlib import Path
 import logging
 from dotenv import load_dotenv, dotenv_values
-
 @dataclass
 class Config:
     """
@@ -36,12 +32,7 @@ class Config:
     - @dataclass装饰器的使用
     - 类型注解的重要性
     - 配置验证的实现
-    - 环境感知配置
     """
-    
-    # 环境配置
-    environment: str = "development"
-    debug: bool = False
     
     # OpenAI API配置
     openai_api_key: str = ""
@@ -67,7 +58,6 @@ class Config:
     allowed_hosts: List[str] = field(default_factory=lambda: ["localhost", "127.0.0.1"])
     rate_limit_per_minute: int = 60
     
-    
     @classmethod
     def from_env(cls, env_file: Optional[str] = None) -> 'Config':
         """
@@ -79,39 +69,33 @@ class Config:
         3. 默认值（最低优先级）
         
         Args:
-            env_file: .env文件路径，如果为None则自动查找
+            env_file: .env文件路径，如果为None则使用根目录的.env文件
             
         Returns:
             Config: 配置实例
-            
-        Raises:
-            ValueError: 当必需的配置缺失时
         """
         # 加载.env文件
-        env_vars = cls._load_env_files(env_file)
+        env_vars = cls._load_env_file(env_file)
         
-        # 获取环境类型
-        environment = cls._get_env_value("ENVIRONMENT", env_vars, "development")
-        debug = cls._get_bool_value("DEBUG", env_vars, environment == "development")
-        
-        # 必需的配置
-        api_key = cls._get_env_value("OPENAI_API_KEY", env_vars)
-        if not api_key and environment == "production":
-            raise ValueError("OPENAI_API_KEY is required in production environment")
+        # 打印环境变量配置
+        print("加载的环境变量配置:")
+        print("-" * 50)
+        for key, value in env_vars.items():
+            # 对敏感信息进行脱敏处理
+            if "key" in key.lower() or "secret" in key.lower() or "password" in key.lower():
+                value = f"***{value[-4:]}" if value else "***"
+            print(f"{key}: {value}")
+        print("-" * 50)
         
         return cls(
-            # 环境配置
-            environment=environment,
-            debug=debug,
-            
             # OpenAI API配置
-            openai_api_key=api_key or "",
-            openai_model=cls._get_env_value("OPENAI_API_MODEL", env_vars, "gpt-3.5-turbo"),
-            openai_base_url=cls._get_env_value("OPENAI_API_BASE_URL", env_vars),
+            openai_api_key=cls._get_env_value("OPENAI_API_KEY", env_vars, ""),
+            openai_model=cls._get_env_value("OPENAI_MODEL", env_vars, "gpt-3.5-turbo"),
+            openai_base_url=cls._get_env_value("OPENAI_BASE_URL", env_vars),
             openai_organization=cls._get_env_value("OPENAI_ORGANIZATION", env_vars),
             
             # 应用程序配置
-            log_level=cls._get_env_value("LOG_LEVEL", env_vars, "DEBUG" if debug else "INFO"),
+            log_level=cls._get_env_value("LOG_LEVEL", env_vars, "INFO"),
             max_conversation_history=cls._get_int_value("MAX_CONVERSATION_HISTORY", env_vars, 50),
             tool_timeout=cls._get_int_value("TOOL_TIMEOUT", env_vars, 30),
             
@@ -130,43 +114,34 @@ class Config:
         )
     
     @staticmethod
-    def _load_env_files(env_file: Optional[str] = None) -> Dict[str, str]:
+    def _load_env_file(env_file: Optional[str] = None) -> Dict[str, str]:
         """
         加载.env文件
         
         Args:
-            env_file: 指定的.env文件路径
+            env_file: 指定的.env文件路径，如果为None则使用根目录的.env文件
             
         Returns:
             Dict[str, str]: 环境变量字典
         """
         env_vars = {}
         
-        if not DOTENV_AVAILABLE:
-            return env_vars
+        # 确定要加载的.env文件路径
+        if env_file:
+            env_file_path = Path(env_file)
+        else:
+            # 默认使用根目录的.env文件
+            env_file_path = Path.cwd() / ".env"
         
-        # 如果指定了文件路径，直接加载
-        if env_file and Path(env_file).exists():
-            env_vars.update(dotenv_values(env_file))
-            return env_vars
-        
-        # 自动查找.env文件
-        current_dir = Path.cwd()
-        env_files_to_try = [
-            current_dir / ".env",
-            current_dir / ".env.local",
-            current_dir / f".env.{os.getenv('ENVIRONMENT', 'development')}",
-        ]
-        
-        # 加载找到的.env文件
-        for env_file_path in env_files_to_try:
-            if env_file_path.exists():
-                try:
-                    file_vars = dotenv_values(str(env_file_path))
-                    env_vars.update(file_vars)
-                    logging.info(f"Loaded environment variables from {env_file_path}")
-                except Exception as e:
-                    logging.warning(f"Failed to load {env_file_path}: {e}")
+        # 加载.env文件
+        if env_file_path.exists():
+            try:
+                env_vars = dotenv_values(str(env_file_path))
+                logging.info(f"Loaded environment variables from {env_file_path}")
+            except Exception as e:
+                logging.warning(f"Failed to load {env_file_path}: {e}")
+        else:
+            logging.info(f"No .env file found at {env_file_path}")
         
         return env_vars
     
@@ -210,15 +185,6 @@ class Config:
         Raises:
             ValueError: 当配置无效时
         """
-        # 验证环境类型
-        valid_environments = ["development", "testing", "production"]
-        if self.environment not in valid_environments:
-            raise ValueError(f"Environment must be one of: {valid_environments}")
-        
-        # 生产环境必须有API密钥
-        if self.environment == "production" and not self.openai_api_key:
-            raise ValueError("OpenAI API key is required in production environment")
-        
         # 验证数值配置
         if self.max_conversation_history <= 0:
             raise ValueError("Max conversation history must be positive")
@@ -255,8 +221,6 @@ class Config:
             Dict[str, Any]: 配置字典（隐藏敏感信息）
         """
         config_dict = {
-            "environment": self.environment,
-            "debug": self.debug,
             "openai_model": self.openai_model,
             "openai_base_url": self.openai_base_url,
             "openai_organization": self.openai_organization,
@@ -279,18 +243,6 @@ class Config:
             config_dict["openai_api_key"] = "Not set"
         
         return config_dict
-    
-    def is_development(self) -> bool:
-        """检查是否为开发环境"""
-        return self.environment == "development"
-    
-    def is_production(self) -> bool:
-        """检查是否为生产环境"""
-        return self.environment == "production"
-    
-    def is_testing(self) -> bool:
-        """检查是否为测试环境"""
-        return self.environment == "testing"
 
 
 # 全局配置实例（单例模式）
@@ -333,14 +285,10 @@ def create_sample_env_file(file_path: str = ".env.example") -> None:
     sample_content = """# OpenManus 配置示例文件
 # 复制此文件为 .env 并填入实际值
 
-# 环境配置
-ENVIRONMENT=development
-DEBUG=true
-
 # OpenAI API配置
 OPENAI_API_KEY=your_openai_api_key_here
-OPENAI_API_MODEL=gpt-3.5-turbo
-# OPENAI_API_BASE_URL=https://api.openai.com/v1
+OPENAI_MODEL=gpt-3.5-turbo
+# OPENAI_BASE_URL=https://api.openai.com/v1
 # OPENAI_ORGANIZATION=your_org_id
 
 # 应用程序配置
@@ -385,10 +333,6 @@ if __name__ == "__main__":
             print(f"{key}: {value}")
         
         print("=" * 50)
-        print(f"当前环境: {config.environment}")
-        print(f"调试模式: {config.debug}")
-        print(f"是否为开发环境: {config.is_development()}")
-        print(f"是否为生产环境: {config.is_production()}")
         
         # 测试配置验证
         print("\n配置验证通过 ✓")
@@ -397,9 +341,8 @@ if __name__ == "__main__":
         print(f"配置错误: {e}")
         print("\n请检查以下事项:")
         print("1. 确保设置了必需的环境变量")
-        print("2. 在生产环境中设置 OPENAI_API_KEY")
-        print("3. 运行以下命令安装 python-dotenv:")
+        print("2. 运行以下命令安装 python-dotenv:")
         print("   pip install python-dotenv")
-        print("4. 创建 .env 文件并填入配置值")
+        print("3. 创建 .env 文件并填入配置值")
     except Exception as e:
         print(f"未知错误: {e}")

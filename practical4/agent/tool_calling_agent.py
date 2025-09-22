@@ -38,20 +38,24 @@ class ToolCallingAgent:
     4. 处理工具执行结果
     """
     
-    def __init__(self, api_key: str, model: str = "gpt-3.5-turbo"):
+    def __init__(self, api_key: str, model: str = "gpt-3.5-turbo", base_url: Optional[str] = None):
         """
         初始化工具调用代理
         
         Args:
             api_key: OpenAI API密钥
             model: 使用的GPT模型名称
+            base_url: 自定义API端点（可选）
         """
-        self.client = AsyncOpenAI(api_key=api_key)
+        if base_url:
+            self.client = AsyncOpenAI(api_key=api_key, base_url=base_url)
+        else:
+            self.client = AsyncOpenAI(api_key=api_key)
         self.model = model
         self.tool_manager = ToolManager()
         self.conversation_history = []
         
-        logger.info(f"ToolCallingAgent initialized with model: {model}")
+        logger.info(f"ToolCallingAgent initialized with model: {model}, base_url: {base_url}")
     
     def register_tool(self, tool: BaseTool) -> None:
         """
@@ -188,9 +192,9 @@ class ToolCallingAgent:
                     "tool_call_id": tool_call.id,
                     "role": "tool",
                     "content": json.dumps({
-                        "success": result.success,
-                        "result": result.result,
-                        "error": result.error
+                        "success": result.is_success,
+                        "result": result.content,
+                        "error": result.error_message
                     }, ensure_ascii=False)
                 })
                 
@@ -246,7 +250,7 @@ class ToolCallingAgent:
         
         tools_description = "\n".join(tools_info) if tools_info else "当前没有可用的工具"
         
-        return f"""你是一个智能助手，能够使用各种工具来帮助用户完成任务。
+        return """你是一个智能助手，能够使用各种工具来帮助用户完成任务。
 
 可用工具：
 {tools_description}
@@ -254,11 +258,24 @@ class ToolCallingAgent:
 请根据用户的请求，选择合适的工具来完成任务。如果需要使用工具，请调用相应的函数。
 如果不需要使用工具，请直接回答用户的问题。
 
-注意事项：
+重要指导原则：
 1. 仔细分析用户的需求
 2. 选择最合适的工具
 3. 正确传递参数
-4. 清晰地解释你的操作和结果
+4. 当工具执行完成后，基于工具返回的结果直接给出最终答案
+5. 绝对不要生成任何代码、函数调用或代码块
+6. 不要使用```符号包围任何内容
+7. 如果是计算问题，直接说出计算结果，例如："计算结果是 6"
+8. 如果是文本处理，直接展示处理后的结果
+9. 用自然语言描述结果，不要使用技术术语或代码格式
+
+示例：
+- 用户问："帮我计算 1 + 2"
+- 工具返回：result: 3
+- 正确回答："计算结果是 3"
+- 错误回答：不要生成任何包含代码的内容
+
+记住：你的回答应该是纯文本，面向普通用户，不包含任何代码或技术格式。
 """
     
     def clear_history(self) -> None:
@@ -301,10 +318,9 @@ async def test_tool_calling_agent():
     
     # 测试用例
     test_cases = [
-        "帮我计算 15 * 23 + 45",
-        "将文本 'Hello World' 转换为大写",
-        "计算圆的面积，半径是5",
-        "分析这段文本的单词数量：'Python is a great programming language'"
+        "用计算工具计算 15 * 23 + 45",
+        "用文本处理工具将文本 'Hello World' 转换为大写",
+        "用文本处理工具分析这段文本的单词数量：'Python is a great programming language'"
     ]
     
     print("=== 工具调用代理测试 ===")

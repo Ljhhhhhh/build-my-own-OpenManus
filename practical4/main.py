@@ -55,7 +55,7 @@ class ToolCallingDemo:
         
         # 加载配置
         try:
-            self.config = Config(os.getenv("OPENAI_API_KEY"))
+            self.config = Config.from_env()
             self.logger.info("配置加载成功")
         except Exception as e:
             self.logger.error(f"配置加载失败: {e}")
@@ -78,7 +78,8 @@ class ToolCallingDemo:
             
             self.agent = ToolCallingAgent(
                 api_key=self.config.openai_api_key,
-                model=self.config.openai_model
+                model=self.config.openai_model,
+                base_url=self.config.openai_base_url
             )
             
             # 注册工具
