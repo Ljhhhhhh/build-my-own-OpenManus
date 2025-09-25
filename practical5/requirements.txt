@@ -1,0 +1,44 @@
+# 项目5：ReAct推理代理 - 依赖包
+
+# OpenAI API客户端
+openai>=1.0.0
+
+# 数据验证和序列化
+pydantic>=2.0.0
+
+# 异步支持
+asyncio
+
+# 环境变量管理
+python-dotenv>=1.0.0
+
+# 类型检查支持
+typing-extensions>=4.0.0
+
+# 测试框架
+pytest>=7.0.0
+pytest-asyncio>=0.21.0
+
+# JSON处理（Python内置，但明确列出用于文档）
+# json - 内置模块
+
+# 正则表达式（Python内置）
+# re - 内置模块
+
+# 时间处理（Python内置）
+# time - 内置模块
+
+# 数据类支持（Python 3.7+内置）
+# dataclasses - 内置模块
+
+# 枚举支持（Python内置）
+# enum - 内置模块
+
+# 路径处理（Python 3.4+内置）
+# pathlib - 内置模块
+
+# 日志记录（Python内置）
+# logging - 内置模块
+
+# 集合工具（Python内置）
+# collections - 内置模块
