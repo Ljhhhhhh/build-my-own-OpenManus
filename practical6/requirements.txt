@@ -1,0 +1,43 @@
+# 项目6：多模态代理 - 依赖包
+
+# OpenAI API客户端
+openai>=1.0.0
+
+# 数据验证和序列化
+pydantic>=2.0.0
+
+# 异步支持
+asyncio
+
+# 环境变量管理
+python-dotenv>=1.0.0
+
+# 类型检查支持
+typing-extensions>=4.0.0
+
+# 测试框架
+pytest>=7.0.0
+pytest-asyncio>=0.21.0
+
+# 新增：多模态功能依赖
+
+# 图像处理
+pillow>=10.0.0
+
+# 浏览器自动化
+selenium>=4.0.0
+
+# WebDriver管理
+webdriver-manager>=4.0.0
+
+# HTTP请求（用于图像下载等）
+requests>=2.31.0
+
+# 图像格式支持
+opencv-python>=4.8.0
+
+# Base64编码支持（Python内置，但明确列出）
+# base64 - 内置模块
+
+# 异步HTTP客户端（可选，用于异步图像处理）
+aiohttp>=3.8.0
