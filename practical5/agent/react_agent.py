@@ -132,7 +132,8 @@ class ReActAgent:
         
         # 配置和日志
         self.config = get_config()
-        self.logger = setup_logger("practical5.ReActAgent")
+        # 让logger同时记录INFO和DEBUG级别日志到react_agent.log
+        self.logger = setup_logger("practical5.ReActAgent", level="DEBUG", log_file="logs/react_agent.log")
         
         # OpenAI客户端
         self.client = AsyncOpenAI(
@@ -204,19 +205,53 @@ class ReActAgent:
             user_query: 用户问题
         """
         self.current_step += 1
-        self.logger.debug(f"执行第 {self.current_step} 步推理")
+        self.logger.info(f"{'='*60}")
+        self.logger.info(f"开始执行第 {self.current_step} 步推理")
+        self.logger.info(f"当前状态: {self.state.value}")
+        self.logger.info(f"用户问题: {user_query}")
         
         try:
-            # 1. 生成ReAct提示词
+            # ===== 阶段1: 生成ReAct提示词 =====
+            self.logger.info(f"[阶段1] 开始生成ReAct提示词")
+            self.logger.debug(f"  - 当前已有步骤数: {len(self.steps)}")
+            self.logger.debug(f"  - 可用工具数: {len(self.tool_manager.list_tools())}")
+            
             prompt = self._get_react_prompt(user_query)
             
-            # 2. 调用LLM
-            response = await self._call_llm(prompt)
+            self.logger.debug(f"  - 提示词生成完成，长度: {len(prompt)} 字符")
+            self.logger.debug(f"  - 提示词预览: {prompt}...")
             
-            # 3. 解析LLM响应
+            # ===== 阶段2: 调用LLM =====
+            self.logger.info(f"[阶段2] 开始调用LLM")
+            self.logger.debug(f"  - 使用模型: {self.model}")
+            self.logger.debug(f"  - 温度参数: {self.temperature}")
+            
+            llm_start_time = time.time()
+            response = await self._call_llm(prompt)
+            llm_duration = time.time() - llm_start_time
+            
+            self.logger.info(f"  - LLM响应完成，耗时: {llm_duration:.2f}秒")
+            self.logger.debug(f"  - 响应长度: {len(response)} 字符")
+            self.logger.debug(f"  - 完整响应内容:\n{response}")
+            
+            # ===== 阶段3: 解析LLM响应 =====
+            self.logger.info(f"[阶段3] 开始解析LLM响应")
+            
             thought, action, final_answer = self._parse_response(response)
             
-            # 4. 创建步骤记录
+            self.logger.info(f"  - 解析完成")
+            self.logger.info(f"  - Thought: {thought}")
+            
+            if final_answer:
+                self.logger.info(f"  - 找到最终答案: {final_answer}")
+            elif action:
+                self.logger.info(f"  - 需要执行Action: {json.dumps(action, ensure_ascii=False)}")
+            else:
+                self.logger.info(f"  - 仅有思考，无具体行动")
+            
+            # ===== 阶段4: 创建步骤记录 =====
+            self.logger.info(f"[阶段4] 创建步骤记录")
+            
             step = ReActStep(
                 step_number=self.current_step,
                 thought=thought,
@@ -225,36 +260,86 @@ class ReActAgent:
                 state=self.state
             )
             
-            # 5. 处理不同情况
+            self.logger.debug(f"  - 步骤记录创建完成: Step #{step.step_number}")
+            
+            # ===== 阶段5: 处理不同情况 =====
+            self.logger.info(f"[阶段5] 根据解析结果处理不同分支")
+            
             if final_answer:
-                # 找到最终答案，结束推理
+                # 分支A: 找到最终答案，结束推理
+                self.logger.info(f"  >>> 分支A: 检测到最终答案，准备结束推理")
+                self.logger.info(f"      最终答案内容: {final_answer}")
+                
                 step.observation = f"最终答案: {final_answer}"
                 step.state = AgentState.FINISHED
                 self.state = AgentState.FINISHED
                 self.steps.append(step)
                 
+                self.logger.info(f"      状态更新: {AgentState.THINKING.value} -> {AgentState.FINISHED.value}")
+                self.logger.info(f"      推理完成！总步数: {self.current_step}")
+                
             elif action:
-                # 需要执行工具调用
+                # 分支B: 需要执行工具调用
+                self.logger.info(f"  >>> 分支B: 需要执行工具调用")
+                
+                tool_name = action.get('name', 'unknown')
+                tool_params = action.get('parameters', {})
+                
+                self.logger.info(f"      工具名称: {tool_name}")
+                self.logger.info(f"      工具参数: {json.dumps(tool_params, ensure_ascii=False)}")
+                
                 step.state = AgentState.ACTING
                 self.state = AgentState.ACTING
                 
+                self.logger.debug(f"      状态更新: -> {AgentState.ACTING.value}")
+                
                 # 执行工具
+                self.logger.info(f"      [5.1] 开始执行工具调用")
+                tool_start_time = time.time()
+                
                 tool_result = await self._execute_tool(action)
+                
+                tool_duration = time.time() - tool_start_time
+                self.logger.info(f"      [5.1] 工具执行完成，耗时: {tool_duration:.2f}秒")
+                self.logger.info(f"      工具执行结果: 成功={tool_result.is_success}")
+                
+                if tool_result.is_success:
+                    self.logger.debug(f"      返回内容: {str(tool_result.content)[:200]}...")
+                else:
+                    self.logger.warning(f"      错误信息: {tool_result.error_message}")
+                
                 step.observation = self._format_tool_result(tool_result)
                 step.state = AgentState.OBSERVING
                 self.state = AgentState.THINKING  # 准备下一轮思考
                 
+                self.logger.debug(f"      状态更新: {AgentState.ACTING.value} -> {AgentState.OBSERVING.value} -> {AgentState.THINKING.value}")
+                
                 self.steps.append(step)
                 
+                self.logger.info(f"      步骤记录已保存，进入下一轮推理")
+                
             else:
-                # 只有思考，没有行动，继续思考
+                # 分支C: 只有思考，没有行动，继续思考
+                self.logger.info(f"  >>> 分支C: 仅有思考，无具体行动")
+                self.logger.warning(f"      注意: LLM未给出Action或Final Answer，可能需要引导")
+                
                 step.observation = "继续思考中..."
                 step.state = AgentState.THINKING
                 self.state = AgentState.THINKING
                 self.steps.append(step)
                 
+                self.logger.debug(f"      保持思考状态，进入下一轮")
+            
+            self.logger.info(f"第 {self.current_step} 步执行完成")
+            self.logger.info(f"{'='*60}\n")
+                
         except Exception as e:
-            self.logger.error(f"执行步骤 {self.current_step} 时发生错误: {e}")
+            self.logger.error(f"{'!'*60}")
+            self.logger.error(f"执行步骤 {self.current_step} 时发生错误")
+            self.logger.error(f"错误类型: {type(e).__name__}")
+            self.logger.error(f"错误信息: {str(e)}")
+            self.logger.error(f"错误位置: ", exc_info=True)
+            
             # 创建错误步骤记录
             error_step = ReActStep(
                 step_number=self.current_step,
@@ -265,6 +350,9 @@ class ReActAgent:
             )
             self.steps.append(error_step)
             self.state = AgentState.ERROR
+            
+            self.logger.error(f"状态更新为: {AgentState.ERROR.value}")
+            self.logger.error(f"{'!'*60}\n")
     
     def _get_react_prompt(self, user_query: str) -> str:
         """
@@ -321,7 +409,7 @@ Final Answer: [最终答案]
     
     def _get_tools_info(self) -> str:
         """
-        获取工具信息的格式化字符串
+        获取详细工具信息
         
         Returns:
             str: 工具信息
@@ -332,25 +420,77 @@ Final Answer: [最终答案]
         
         tools_info = []
         for tool in tools:
-            info = f"- {tool['name']}: {tool['description']}"
+            # 工具名称和描述
+            info_lines = [f"\n【工具】{tool['name']}"]
+            info_lines.append(f"  描述: {tool['description']}")
+            
             # 添加参数信息
             schema = tool.get('schema', {})
             if 'properties' in schema:
-                params = []
+                info_lines.append(f"  参数:")
                 required = schema.get('required', [])
+                
                 for param_name, param_info in schema['properties'].items():
-                    param_desc = param_info.get('description', '')
+                    param_desc = param_info.get('description', '无描述')
                     param_type = param_info.get('type', 'any')
                     is_required = param_name in required
-                    req_mark = "*" if is_required else ""
-                    params.append(f"{param_name}{req_mark}({param_type}): {param_desc}")
-                
-                if params:
-                    info += f"\n  参数: {', '.join(params)}"
+                    req_mark = "[必需]" if is_required else "[可选]"
+                    
+                    # 基本参数信息
+                    param_line = f"    - {param_name} {req_mark} ({param_type}): {param_desc}"
+                    
+                    # 特别处理：如果参数有枚举值，显示所有可选值
+                    if 'enum' in param_info:
+                        enum_values = param_info['enum']
+                        param_line += f"\n      可选值: {', '.join(map(str, enum_values))}"
+                        
+                        # 如果工具实例有获取操作描述的方法，使用它
+                        tool_instance = self._get_tool_instance(tool['name'])
+                        if tool_instance and hasattr(tool_instance, 'get_operation_description'):
+                            # 为每个操作添加详细说明
+                            operation_details = []
+                            for op in enum_values:
+                                op_desc = tool_instance.get_operation_description(op)
+                                if op_desc:
+                                    operation_details.append(f"'{op}': {op_desc}")
+                            
+                            if operation_details:
+                                param_line += f"\n      操作说明:"
+                                for detail in operation_details:
+                                    param_line += f"\n        • {detail}"
+                    
+                    # 处理其他约束
+                    if 'minimum' in param_info:
+                        param_line += f" (最小值: {param_info['minimum']})"
+                    if 'maximum' in param_info:
+                        param_line += f" (最大值: {param_info['maximum']})"
+                    if 'default' in param_info:
+                        param_line += f" (默认: {param_info['default']})"
+                    
+                    info_lines.append(param_line)
             
-            tools_info.append(info)
+            tools_info.append('\n'.join(info_lines))
         
-        return "\n".join(tools_info)
+        return '\n'.join(tools_info)
+    
+    def _get_tool_instance(self, tool_name: str):
+        """
+        获取工具实例
+        
+        Args:
+            tool_name: 工具名称
+            
+        Returns:
+            工具实例，如果不存在则返回None
+        """
+        try:
+            # 从工具管理器获取工具实例
+            if hasattr(self.tool_manager, '_tools'):
+                return self.tool_manager._tools.get(tool_name)
+            return None
+        except Exception as e:
+            self.logger.debug(f"获取工具实例失败: {e}")
+            return None
     
     def _get_steps_history(self) -> str:
         """
@@ -430,30 +570,156 @@ Final Answer: [最终答案]
                 final_answer = final_answer_match.group(1).strip()
                 return thought, None, final_answer
             
-            # 提取Action
-            action_match = re.search(r'Action:\s*(\{.*?\})', response, re.DOTALL)
-            if action_match:
+            # 提取Action - 使用改进的方法处理嵌套JSON
+            action_str = self._extract_action_json(response)
+            if action_str:
                 try:
-                    action_str = action_match.group(1).strip()
                     # 处理可能的换行符和多余空格
-                    action_str = re.sub(r'\s+', ' ', action_str)
-                    action = json.loads(action_str)
+                    action_str_cleaned = re.sub(r'\s+', ' ', action_str)
+                    action = json.loads(action_str_cleaned)
+                    self.logger.debug(f"成功解析Action JSON: {action}")
                 except json.JSONDecodeError as e:
-                    self.logger.warning(f"解析Action JSON失败: {e}, 原文: {action_str}")
+                    self.logger.warning(f"解析Action JSON失败: {e}")
+                    self.logger.debug(f"原始字符串: {action_str}")
+                    self.logger.debug(f"清理后字符串: {action_str_cleaned}")
+                    
                     # 尝试修复常见的JSON格式问题
-                    try:
-                        # 如果缺少结束括号，尝试添加
-                        if action_str.count('{') > action_str.count('}'):
-                            action_str += '}'
-                        action = json.loads(action_str)
-                    except json.JSONDecodeError:
-                        action = None
+                    action = self._try_fix_json(action_str_cleaned)
+                    if action:
+                        self.logger.info(f"JSON修复成功: {action}")
             
             return thought, action, final_answer
             
         except Exception as e:
             self.logger.error(f"解析LLM响应时发生错误: {e}")
             return f"解析错误: {e}", None, None
+    
+    def _extract_action_json(self, response: str) -> Optional[str]:
+        """
+        从响应中提取Action的JSON字符串（支持嵌套JSON）
+        
+        使用括号计数法来正确处理嵌套的JSON对象
+        
+        Args:
+            response: LLM响应文本
+            
+        Returns:
+            Optional[str]: 提取的JSON字符串，如果没找到则返回None
+        """
+        # 查找Action:的位置
+        action_match = re.search(r'Action:\s*', response)
+        if not action_match:
+            return None
+        
+        start_pos = action_match.end()
+        
+        # 跳过Action:后面的空白字符，找到{的位置
+        while start_pos < len(response) and response[start_pos].isspace():
+            start_pos += 1
+        
+        if start_pos >= len(response) or response[start_pos] != '{':
+            self.logger.warning(f"Action后面没有找到JSON对象起始符 '{{' ")
+            return None
+        
+        # 使用括号计数法提取完整的JSON对象
+        brace_count = 0
+        in_string = False
+        escape_next = False
+        json_start = start_pos
+        
+        for i in range(start_pos, len(response)):
+            char = response[i]
+            
+            # 处理字符串中的转义字符
+            if escape_next:
+                escape_next = False
+                continue
+            
+            if char == '\\':
+                escape_next = True
+                continue
+            
+            # 处理字符串边界（只在非转义的引号时切换）
+            if char == '"':
+                in_string = not in_string
+                continue
+            
+            # 只在字符串外部计数括号
+            if not in_string:
+                if char == '{':
+                    brace_count += 1
+                elif char == '}':
+                    brace_count -= 1
+                    
+                    # 当括号计数回到0时，说明找到了完整的JSON对象
+                    if brace_count == 0:
+                        json_str = response[json_start:i+1]
+                        self.logger.debug(f"提取的JSON字符串长度: {len(json_str)}")
+                        return json_str
+        
+        # 如果循环结束还没找到完整的JSON，返回已找到的部分
+        partial_json = response[json_start:]
+        self.logger.warning(f"未找到完整的JSON对象，括号不匹配，缺少 {brace_count} 个 '}}'")
+        self.logger.debug(f"部分JSON: {partial_json[:200]}...")
+        return partial_json
+    
+    def _try_fix_json(self, json_str: str) -> Optional[Dict[str, Any]]:
+        """
+        尝试修复常见的JSON格式问题
+        
+        Args:
+            json_str: 可能有问题的JSON字符串
+            
+        Returns:
+            Optional[Dict]: 修复后的JSON对象，如果无法修复则返回None
+        """
+        fixes_attempted = []
+        
+        try:
+            # 修复1: 补全缺失的结束括号
+            open_braces = json_str.count('{')
+            close_braces = json_str.count('}')
+            if open_braces > close_braces:
+                missing = open_braces - close_braces
+                fixed_str = json_str + '}' * missing
+                fixes_attempted.append(f"添加 {missing} 个缺失的 '}}'")
+                
+                try:
+                    result = json.loads(fixed_str)
+                    self.logger.info(f"修复成功（{', '.join(fixes_attempted)}）")
+                    return result
+                except json.JSONDecodeError:
+                    pass
+            
+            # 修复2: 移除末尾可能的多余字符
+            json_str_stripped = json_str.rstrip()
+            if json_str_stripped != json_str:
+                fixes_attempted.append("移除末尾空白")
+                try:
+                    result = json.loads(json_str_stripped)
+                    self.logger.info(f"修复成功（{', '.join(fixes_attempted)}）")
+                    return result
+                except json.JSONDecodeError:
+                    pass
+            
+            # 修复3: 尝试找到最后一个有效的JSON结构
+            for i in range(len(json_str) - 1, -1, -1):
+                if json_str[i] == '}':
+                    test_str = json_str[:i+1]
+                    try:
+                        result = json.loads(test_str)
+                        fixes_attempted.append(f"截断到位置 {i+1}")
+                        self.logger.info(f"修复成功（{', '.join(fixes_attempted)}）")
+                        return result
+                    except json.JSONDecodeError:
+                        continue
+            
+            self.logger.warning(f"所有JSON修复尝试均失败: {fixes_attempted}")
+            return None
+            
+        except Exception as e:
+            self.logger.error(f"修复JSON时发生异常: {e}")
+            return None
     
     async def _execute_tool(self, action: Dict[str, Any]) -> ToolResult:
         """
